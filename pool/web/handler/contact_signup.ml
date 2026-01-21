@@ -32,14 +32,15 @@ let sign_up_create req =
     ||> HttpUtils.remove_empty_values
     ||> HttpUtils.format_request_boolean_values [ terms_key ]
   in
-  let result { Pool_context.database_label; query_parameters; language; user; _ } =
+  let result { Pool_context.database_label; database_connect; query_parameters; language; user; _ } =
     let open Utils.Lwt_result.Infix in
     let tags = Pool_context.Logger.Tags.req req in
     Response.bad_request_on_error ~urlencoded sign_up
     @@ let* () = Helpers.terms_and_conditions_accepted urlencoded in
+       database_connect ~transaction:true @@ fun db_conn ->
        let%lwt allowed_email_suffixes =
          let open Utils.Lwt_result.Infix in
-         Settings.find_email_suffixes database_label
+         Settings.find_email_suffixes' db_conn
          ||> fun suffixes -> if CCList.is_empty suffixes then None else Some suffixes
        in
        let* answered_custom_fields =

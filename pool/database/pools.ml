@@ -271,6 +271,9 @@ module Make (Config : Pools_sig.ConfigSig) = struct
     |> Pool.map_fetched database_label
   ;;
 
+  let query' database_label f = query database_label (fun conn -> let%lwt r = f (database_label, conn) in Lwt.return (Ok r))
+  ;;
+
   let collect label request input =
     query label (fun connection ->
       let module Connection = (val connection : Caqti_lwt.CONNECTION) in
@@ -341,6 +344,9 @@ module Make (Config : Pools_sig.ConfigSig) = struct
         (rollback label connection))
     |> Pool.map_fetched label
   ;;
+
+  let transaction' ?setup ?cleanup label f =
+    transaction ?setup ?cleanup label (fun conn -> let%lwt r = f (label, conn) in Lwt.return (Ok r))
 
   let transaction_iter label queries =
     Caqti_lwt_unix.Pool.use (fun connection ->

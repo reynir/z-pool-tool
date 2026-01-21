@@ -174,6 +174,7 @@ val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
 val find_languages : Database.Label.t -> Pool_common.Language.t list Lwt.t
 val find_email_suffixes : Database.Label.t -> EmailSuffix.t list Lwt.t
+val find_email_suffixes' : Database.Label.t * Caqti_lwt.connection -> EmailSuffix.t list Lwt.t
 val find_contact_email : Database.Label.t -> ContactEmail.t Lwt.t
 
 val find_inactive_user_disable_after

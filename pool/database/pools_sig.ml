@@ -60,6 +60,11 @@ module type Sig = sig
     -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
     -> 'a Lwt.t
 
+  val query'
+    :  Entity.Label.t
+    -> (Entity.Label.t * Caqti_lwt.connection -> 'a Lwt.t)
+    -> 'a Lwt.t
+
   val collect
     :  Entity.Label.t
     -> ('a, 'b, [< `Many | `One | `Zero ]) Caqti_request.t
@@ -88,6 +93,13 @@ module type Sig = sig
     -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
     -> Entity.Label.t
     -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
+    -> 'a Lwt.t
+
+  val transaction'
+    :  ?setup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+    -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+    -> Entity.Label.t
+    -> (Entity.Label.t * Caqti_lwt.connection -> 'a Lwt.t)
     -> 'a Lwt.t
 
   val transaction_iter

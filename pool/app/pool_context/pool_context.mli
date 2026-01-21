@@ -45,6 +45,8 @@ type t =
   { query_parameters : (Pool_message.Field.t * string) list
   ; language : Pool_common.Language.t
   ; database_label : Database.Label.t
+  ; database_connect : 'a. transaction:bool ->
+      (Database.Label.t * Caqti_lwt.connection -> 'a Lwt.t) -> 'a Lwt.t
   ; message : Pool_message.Collection.t option
   ; csrf : string
   ; user : user

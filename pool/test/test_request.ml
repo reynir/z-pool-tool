@@ -5,16 +5,7 @@ let mock_context
       ()
   =
   let open Pool_context in
-  { query_parameters = []
-  ; language
-  ; database_label
-  ; message = None
-  ; csrf = "csrf"
-  ; user
-  ; guardian = []
-  ; notifications = []
-  ; flash_fetcher = None
-  }
+  create ([], language, database_label, None, "csrf", user, [], [])
 ;;
 
 let mock_request

@@ -29,6 +29,11 @@ module Sql = struct
     Database.find pool (find_request out_type) (Key.to_json_string key)
   ;;
 
+  let find' (label, (module Connection : Caqti_lwt.CONNECTION)) out_type key =
+    Connection.find (find_request out_type) (Key.to_json_string key)
+  |> Database.Pool.raise_caqti_error label
+  ;;
+
   let update_sql =
     {sql|
       UPDATE
@@ -83,6 +88,7 @@ module SettingRepo (T : SettingRepoSig) = struct
 
   let caqti_type = make_caqti ~encode:yojson_of_t ~decode:t_of_yojson
   let find pool = Sql.find pool caqti_type key
+  let find' conn = Sql.find' conn caqti_type key
   let find_id pool = Sql.find_setting_id pool key
 
   let create_changelog ?user_uuid pool after =

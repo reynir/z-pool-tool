@@ -126,6 +126,11 @@ val query
   -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
   -> 'a Lwt.t
 
+val query'
+  :  Label.t
+  -> (Label.t * Caqti_lwt.connection -> 'a Lwt.t)
+  -> 'a Lwt.t
+
 val collect
   :  Label.t
   -> ('a, 'b, [< `Many | `One | `Zero ]) Caqti_request.t
@@ -154,6 +159,13 @@ val transaction
   -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
   -> Label.t
   -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
+  -> 'a Lwt.t
+
+val transaction'
+  :  ?setup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+  -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+  -> Label.t
+  -> (Label.t * Caqti_lwt.connection -> 'a Lwt.t)
   -> 'a Lwt.t
 
 val transaction_iter
@@ -273,6 +285,8 @@ module Pool : sig
   val disconnect : ?error:Caqti_error.t -> Label.t -> unit Lwt.t
   val all : ?allowed_status:Status.t list -> ?exclude:Label.t list -> unit -> Label.t list
   val is_root : Label.t -> bool
+  val raise_caqti_error : Label.t -> ('a, [ Caqti_error.t | `Unsupported ]) result Lwt.t -> 'a Lwt.t
+
 
   module Root : sig
     val label : Label.t

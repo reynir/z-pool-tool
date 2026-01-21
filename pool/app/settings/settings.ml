@@ -4,6 +4,7 @@ module Guard = Entity_guard
 
 let find_languages = Repo.TenantLanguages.find
 let find_email_suffixes = Repo.TenantEmailSuffixes.find
+let find_email_suffixes' = Repo.TenantEmailSuffixes.find'
 let find_contact_email = Repo.TenantContactEmail.find
 let find_inactive_user_disable_after = Repo.InactiveUserDisableAfter.find
 let find_inactive_user_warning = Repo.InactiveUserWarning.find

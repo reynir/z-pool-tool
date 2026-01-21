@@ -39,6 +39,9 @@ type t =
   { query_parameters : (Pool_message.Field.t * string) list
   ; language : Pool_common.Language.t
   ; database_label : Database.Label.t
+  ; database_connect : 'a. transaction:bool ->
+      (Database.Label.t * Caqti_lwt.connection -> 'a Lwt.t) -> 'a Lwt.t
+                       [@printer Utils.ppx_printer "database_connect"]
   ; message : Pool_message.Collection.t option
   ; csrf : string
   ; user : user
@@ -58,9 +61,16 @@ let create
       , guardian
       , notifications )
   =
+  let database_connect ~transaction f =
+    if transaction then
+      Database.transaction' database_label f
+    else
+      Database.query' database_label f
+  in
   { query_parameters
   ; language
   ; database_label
+  ; database_connect
   ; message
   ; csrf
   ; user
