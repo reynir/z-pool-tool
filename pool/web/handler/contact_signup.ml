@@ -44,7 +44,7 @@ let sign_up_create req =
          ||> fun suffixes -> if CCList.is_empty suffixes then None else Some suffixes
        in
        let* answered_custom_fields =
-         Custom_field.all_prompted_on_registration database_label
+         Custom_field.all_prompted_on_registration db_conn
          >|> Helpers_custom_field.answer_and_validate_multiple
                req
                urlencoded
@@ -70,7 +70,7 @@ let sign_up_create req =
          let* ({ UserCommand.firstname; lastname; _ } as decoded) =
            Command.SignUp.decode urlencoded |> Lwt_result.lift
          in
-         let%lwt token = Email.create_token database_label email_address in
+         let%lwt token = Email.create_token db_conn email_address in
          let signup_code =
            let open Signup_code in
            let open CCOption.Infix in
@@ -83,7 +83,7 @@ let sign_up_create req =
          let%lwt verification_mail =
            Message_template.SignUpVerification.create
              ?signup_code
-             database_label
+             db_conn
              (CCOption.value ~default:language query_language)
              tenant
              email_address
@@ -105,7 +105,7 @@ let sign_up_create req =
               query_language
          |> Lwt_result.lift
        in
-       let%lwt existing_user = Pool_user.find_by_email_opt database_label email_address in
+       let%lwt existing_user = Pool_user.find_by_email_opt db_conn email_address in
        let* events =
          match existing_user with
          | None ->
@@ -114,14 +114,14 @@ let sign_up_create req =
            Lwt_result.return events
          | Some user when Pool_user.is_admin user -> Lwt_result.return []
          | Some _ ->
-           let%lwt contact = email_address |> Contact.find_by_email database_label in
+           let%lwt contact = email_address |> Contact.find_by_email db_conn in
            let* events =
              contact
              |> function
              | Ok contact when contact |> Contact.user |> Pool_user.is_confirmed ->
                let%lwt send_notification =
                  Contact.should_send_registration_attempt_notification
-                   database_label
+                   db_conn
                    contact
                in
                if not send_notification
@@ -145,7 +145,7 @@ let sign_up_create req =
            log_request ();
            Lwt_result.return events
        in
-       let%lwt () = Pool_event.handle_events ~tags database_label user events in
+       let%lwt () = Pool_event.handle_events ~tags db_conn user events in
        HttpUtils.(
          redirect_to_with_actions
            "/email-confirmation"
