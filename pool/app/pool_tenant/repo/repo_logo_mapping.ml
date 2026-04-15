@@ -88,13 +88,13 @@ module Sql = struct
     select_from_tenant_logo_mappings_sql where_fragment |> Pool_common.Repo.Id.t ->! t
   ;;
 
-  let find pool = Database.collect pool find_request
+  let find db_ctx = Database.collect db_ctx find_request
 
   let find_all_request =
     "" |> select_from_tenant_logo_mappings_sql |> Caqti_type.unit ->! t
   ;;
 
-  let find_all pool = Database.collect pool find_all_request
+  let find_all db_ctx = Database.collect db_ctx find_all_request
 
   let insert_request =
     [%string
@@ -114,7 +114,7 @@ module Sql = struct
     |> Write.t ->. Caqti_type.unit
   ;;
 
-  let insert pool = Database.exec pool insert_request
+  let insert db_ctx = Database.exec db_ctx insert_request
 
   let delete_request =
     [%string
@@ -126,10 +126,18 @@ module Sql = struct
     |> Caqti_type.(t2 RepoId.t RepoId.t ->. unit)
   ;;
 
-  let delete pool = CCFun.curry (Database.exec pool delete_request)
+  let delete db_ctx = CCFun.curry (Database.exec db_ctx delete_request)
 end
 
-let insert_multiple = Lwt_list.iter_s (Sql.insert Database.Pool.Root.label)
-let find_by_tenant = Sql.find Database.Pool.Root.label
-let find_all = Sql.find_all Database.Pool.Root.label
-let delete = Sql.delete Database.Pool.Root.label
+let insert_multiple xs =
+  Database.(transaction_ctx Pool.Root.label) @@ fun db_ctx ->
+  Lwt_list.iter_s (Sql.insert db_ctx) xs
+let find_by_tenant id =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Sql.find db_ctx id
+let find_all () =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Sql.find_all db_ctx ()
+let delete tenant_uuid asset_uuid =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Sql.delete db_ctx tenant_uuid asset_uuid

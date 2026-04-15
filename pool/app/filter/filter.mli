@@ -181,16 +181,16 @@ val validate_query
   -> (query, Pool_message.Error.t) result
 
 val contains_template : query -> bool
-val find : Database.Label.t -> Pool_common.Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-val find_all_templates : Database.Label.t -> unit -> t list Lwt.t
-val find_templates_by : Query.t -> Database.Label.t -> (t list * Query.t) Lwt.t
+val find : Database.ctx -> Pool_common.Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val find_all_templates : Database.ctx -> unit -> t list Lwt.t
+val find_templates_by : Query.t -> Database.ctx -> (t list * Query.t) Lwt.t
 
 val find_template
-  :  Database.Label.t
+  :  Database.ctx
   -> Pool_common.Id.t
   -> (t, Pool_message.Error.t) Lwt_result.t
 
-val find_multiple_templates : Database.Label.t -> Pool_common.Id.t list -> t list Lwt.t
+val find_multiple_templates : Database.ctx -> Pool_common.Id.t list -> t list Lwt.t
 
 type event =
   | Created of t
@@ -200,7 +200,7 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.Label.t -> event -> unit Lwt.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
 val created : t -> event
 val deleted : t -> event
 val updated : t -> t -> event
@@ -227,15 +227,15 @@ module Repo : sig
   val query : query Caqti_type.t
 end
 
-val all_keys : Database.Label.t -> Key.human list Lwt.t
+val all_keys : Database.ctx -> Key.human list Lwt.t
 
 val key_of_string
-  :  Database.Label.t
+  :  Database.ctx
   -> string
   -> (Key.human, Pool_message.Error.t) Lwt_result.t
 
 val t_to_human : Key.human list -> t list -> query -> Human.t
-val find_templates_of_query : Database.Label.t -> query -> t list Lwt.t
+val find_templates_of_query : Database.ctx -> query -> t list Lwt.t
 val toggle_predicate_type : Human.t -> string -> (Human.t, Pool_message.Error.t) result
 val all_query_experiments : t -> Pool_common.Id.t list
 val all_query_tags : t -> Tags.Id.t list
@@ -245,7 +245,7 @@ type base_condition =
   | Matcher of Pool_common.Id.t
 
 val find_filtered_contacts
-  :  Database.Label.t
+  :  Database.ctx
   -> ?order_by:string
   -> ?limit:int
   -> base_condition
@@ -254,14 +254,14 @@ val find_filtered_contacts
 
 val count_filtered_contacts
   :  ?include_invited:bool
-  -> Database.Label.t
+  -> Database.ctx
   -> base_condition
   -> query option
   -> (int, Pool_message.Error.t) Lwt_result.t
 
 val contact_matches_filter
   :  ?default:bool
-  -> Database.Label.t
+  -> Database.ctx
   -> query
   -> Contact.t
   -> bool Lwt.t

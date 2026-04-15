@@ -17,9 +17,12 @@ module I18nCache = struct
     create 5
   ;;
 
-  let find = find_opt tbl
+  let find (db_ctx, key, language) =
+    let database_label = Database.label_of_ctx db_ctx in
+    find_opt tbl (database_label, key, language)
 
-  let add database_label key language value =
+  let add db_ctx key language value =
+    let database_label = Database.label_of_ctx db_ctx in
     replace tbl (database_label, key, language) value
   ;;
 
@@ -29,14 +32,15 @@ module I18nCache = struct
   ;;
 end
 
-let privacy_policy_is_set database_label language =
+let privacy_policy_is_set db_ctx language =
   let open Utils.Lwt_result.Infix in
+  let database_label = Database.label_of_ctx db_ctx in
   Hashtbl.find_opt I18nCache.privacy_policy (database_label, language)
   |> function
   | Some bool -> Lwt.return bool
   | None ->
     let%lwt existing =
-      find_by_key_opt database_label Key.PrivacyPolicy language ||> CCOption.is_some
+      find_by_key_opt db_ctx Key.PrivacyPolicy language ||> CCOption.is_some
     in
     let () = Hashtbl.add I18nCache.privacy_policy (database_label, language) existing in
     Lwt.return existing

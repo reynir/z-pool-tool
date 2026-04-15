@@ -34,7 +34,7 @@ let tenant_steps = Tenant.steps
 let handle_event _ : event -> unit Lwt.t = function
   | Migrated database ->
     let label = database |> label in
-    let tags = Logger.Tags.create label in
+    let tags = Logger.Tags.create_by_label label in
     Logs.info (fun m -> m ~tags "Migrating: %a" Label.pp label);
     (match label |> Pool.is_root with
      | true ->

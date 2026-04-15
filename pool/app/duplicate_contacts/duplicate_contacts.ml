@@ -8,7 +8,7 @@ let all = Repo.all
 let find_by_contact = Repo.find_by_contact
 let count = Repo.count
 
-let merge pool ?user_uuid ({ contact; merged_contact; _ } as merge) =
+let merge db_ctx ?user_uuid ({ contact; merged_contact; _ } as merge) =
   let formatted contact =
     let open Contact in
     Format.asprintf
@@ -19,13 +19,13 @@ let merge pool ?user_uuid ({ contact; merged_contact; _ } as merge) =
   Logs.info (fun m ->
     m "Merging contact %s into %s" (formatted merged_contact) (formatted contact));
   let%lwt invitations =
-    Invitation.find_by_contact_to_merge pool ~contact ~merged_contact
+    Invitation.find_by_contact_to_merge db_ctx ~contact ~merged_contact
   in
   let%lwt waiting_list =
-    Waiting_list.find_by_contact_to_merge pool ~contact ~merged_contact
+    Waiting_list.find_by_contact_to_merge db_ctx ~contact ~merged_contact
   in
   let%lwt assignments =
-    Assignment.find_by_contact_to_merge pool ~contact ~merged_contact
+    Assignment.find_by_contact_to_merge db_ctx ~contact ~merged_contact
   in
   let contact =
     let open Contact in
@@ -37,7 +37,7 @@ let merge pool ?user_uuid ({ contact; merged_contact; _ } as merge) =
          ~step:(merged_contact.num_participations |> NumberOfParticipations.value)
   in
   Repo_merge.merge
-    pool
+    db_ctx
     ?user_uuid
     { merge with contact }
     invitations

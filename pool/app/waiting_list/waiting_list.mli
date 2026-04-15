@@ -60,24 +60,24 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.Label.t -> event -> unit Lwt.t
-val find : Database.Label.t -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-val user_is_enlisted : Database.Label.t -> Contact.t -> Experiment.Id.t -> bool Lwt.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
+val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val user_is_enlisted : Database.ctx -> Contact.t -> Experiment.Id.t -> bool Lwt.t
 
 val find_by_experiment
   :  ?query:Query.t
-  -> Database.Label.t
+  -> Database.ctx
   -> Experiment.Id.t
   -> (t list * Query.t) Lwt.t
 
 val find_by_contact_and_experiment
-  :  Database.Label.t
+  :  Database.ctx
   -> Contact.t
   -> Experiment.Id.t
   -> t option Lwt.t
 
 val find_by_contact_to_merge
-  :  Database.Label.t
+  :  Database.ctx
   -> contact:Contact.t
   -> merged_contact:Contact.t
   -> t list Lwt.t

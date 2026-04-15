@@ -16,30 +16,30 @@ type event =
   | PageScriptUpdated of (PageScript.t option * PageScript.location)
 [@@deriving eq, show]
 
-let handle_event ?user_uuid pool : event -> unit Lwt.t = function
-  | LanguagesUpdated languages -> Repo.TenantLanguages.update ?user_uuid pool languages
+let handle_event ?user_uuid db_ctx : event -> unit Lwt.t = function
+  | LanguagesUpdated languages -> Repo.TenantLanguages.update ?user_uuid db_ctx languages
   | EmailSuffixesUpdated suffixes ->
-    Repo.TenantEmailSuffixes.update ?user_uuid pool suffixes
+    Repo.TenantEmailSuffixes.update ?user_uuid db_ctx suffixes
   | DefaultReminderLeadTimeUpdated lead_time ->
-    Repo.DefaultReminderLeadTime.update ?user_uuid pool lead_time
+    Repo.DefaultReminderLeadTime.update ?user_uuid db_ctx lead_time
   | DefaultTextMsgReminderLeadTimeUpdated lead_time ->
-    Repo.DefaultTextMsgReminderLeadTime.update ?user_uuid pool lead_time
+    Repo.DefaultTextMsgReminderLeadTime.update ?user_uuid db_ctx lead_time
   | ContactEmailUpdated contact_email ->
-    Repo.TenantContactEmail.update ?user_uuid pool contact_email
+    Repo.TenantContactEmail.update ?user_uuid db_ctx contact_email
   (* Using the database label passed through the event, as this event has the root context *)
   | ContactEmailCreated (contact_email, tenant_db) ->
-    Repo.TenantContactEmail.update tenant_db contact_email
+    Repo.TenantContactEmail.update (Database.label_ctx tenant_db) contact_email
   | InactiveUserDisableAfterUpdated disable_after ->
-    Repo.InactiveUserDisableAfter.update ?user_uuid pool disable_after
+    Repo.InactiveUserDisableAfter.update ?user_uuid db_ctx disable_after
   | InactiveUserWarningUpdated warning_after ->
-    Repo.InactiveUserWarning.update ?user_uuid pool warning_after
+    Repo.InactiveUserWarning.update ?user_uuid db_ctx warning_after
   | InactiveUserServiceDisabled disabled ->
-    Repo.InactiveUserServiceDisabled.update ?user_uuid pool disabled
+    Repo.InactiveUserServiceDisabled.update ?user_uuid db_ctx disabled
   | TriggerProfileUpdateAfterUpdated trigger_after ->
-    Repo.TriggerProfileUpdateAfter.update ?user_uuid pool trigger_after
+    Repo.TriggerProfileUpdateAfter.update ?user_uuid db_ctx trigger_after
   | UserImportFirstReminderAfterUpdated first_reminder_after ->
-    Repo.UserImportFirstReminder.update ?user_uuid pool first_reminder_after
+    Repo.UserImportFirstReminder.update ?user_uuid db_ctx first_reminder_after
   | UserImportSecondReminderAfterUpdated second_reminder_after ->
-    Repo.UserImportSecondReminder.update ?user_uuid pool second_reminder_after
-  | PageScriptUpdated script -> Repo.PageScripts.update ?user_uuid pool script
+    Repo.UserImportSecondReminder.update ?user_uuid db_ctx second_reminder_after
+  | PageScriptUpdated script -> Repo.PageScripts.update ?user_uuid db_ctx script
 ;;

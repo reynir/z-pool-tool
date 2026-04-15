@@ -120,16 +120,17 @@ let steps =
 let check_migration_status pool () =
   let open Utils.Lwt_result.Infix in
   let open Database in
+  let db_ctx = label_ctx pool in
   let migrations = steps () in
   let%lwt () =
     let%lwt up_to_date =
-      Migration.pending_migrations pool ~migrations () ||> CCList.is_empty
+      Migration.pending_migrations db_ctx ~migrations () ||> CCList.is_empty
     in
     Pool.Tenant.update_status
       pool
       Status.(if up_to_date then Active else MigrationsPending)
   in
-  Migration.check_migrations_status pool ~migrations ()
+  Migration.check_migrations_status db_ctx ~migrations ()
 ;;
 
 let report err =
@@ -154,7 +155,7 @@ let report err =
         |> Lwt_result.lift
         >== Pool.Tenant.find_label_by_url
       in
-      let tags = Database.Logger.Tags.create database_label in
+      let tags = Database.Logger.Tags.create_by_label database_label in
       Logs.err (fun m -> m ~tags "%s" printed_error);
       Pool.Tenant.update_status database_label Status.ConnectionIssue >|> Lwt.return_ok
     | None ->

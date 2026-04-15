@@ -40,6 +40,10 @@ end
 
 module Label : sig
   include Pool_model.Base.StringSig
+
+  val to_ctx : t -> (string * string) list
+  val of_ctx_opt : (string * string) list -> t option
+  val of_ctx_exn : (string * string) list -> t
 end
 
 module Url : sig
@@ -77,9 +81,6 @@ val equal : t -> t -> bool
 val create : ?status:Status.t -> Label.t -> Url.t -> t
 val label : t -> Label.t
 val status : t -> Status.t
-val to_ctx : Label.t -> (string * string) list
-val of_ctx_opt : (string * string) list -> Label.t option
-val of_ctx_exn : (string * string) list -> Label.t
 
 module Repo : sig
   val make_caqti_type
@@ -106,12 +107,50 @@ module Repo : sig
   val t : t Caqti_type.t
 end
 
+type no_transaction = private [ `No_transaction ]
+(** Phantom type signaling the connection is not in a transaction *)
+
+type transaction = private [ `Transaction ]
+(** Phantom type signaling the connection is in a transaction *)
+
+type _ ctx = private
+  | Label : Label.t -> no_transaction ctx
+  | Connection : { conn : Caqti_lwt.connection; label : Label.t } -> no_transaction ctx
+  | TransactionalConnection : { conn : Caqti_lwt.connection; label : Label.t } -> transaction ctx
+  (** ['maybe_transaction ctx] is either a [Label _] where a fresh database
+      connection from the pool is used for each query, a [Connection _] where
+      the same database connection is used for all queries, or
+      [TransactionalConnection _] where a transaction is run the same database
+      connection for all queries. See the constructors {!label_ctx},
+      {!connection_ctx} and {!transaction_ctx}. *)
+
+val label_of_ctx : _ ctx -> Label.t
+val to_ctx : _ ctx -> (string * string) list
+
+
+val label_ctx : Label.t -> no_transaction ctx
+(** [label_ctx database_label] is a database context where a database connection is pulled from the database connection pool for every query. *)
+val connection_ctx : Label.t -> (no_transaction ctx -> 'a Lwt.t) -> 'a Lwt.t
+val transaction_ctx : Label.t -> (transaction ctx -> 'a Lwt.t) -> 'a Lwt.t
+
+val resolve_ctx : ?db_ctx:_ ctx -> Label.t -> no_transaction ctx
+(** [resolve_ctx ?db_ctx database_label] asserts that [~db_ctx] corresponds to
+    [database_label] or creates a [Label database_label] ctx if [db_ctx] is
+    [None].
+    {em Warning:} This will cast a [transaction ctx] into a [no_transaction
+    ctx]! Do not use this if this breaks assumptions such as database updates
+    being observable outside the transaction. *)
+
 module Logger : sig
   module Tags : sig
     val add_label : string Logs.Tag.def
-    val add : Label.t -> Logs.Tag.set -> Logs.Tag.set
-    val create : Label.t -> Logs.Tag.set
-    val extend : Label.t -> Logs.Tag.set option -> Logs.Tag.set
+    val add : _ ctx -> Logs.Tag.set -> Logs.Tag.set
+    val create : _ ctx -> Logs.Tag.set
+    val extend : _ ctx -> Logs.Tag.set option -> Logs.Tag.set
+
+    val add_by_label : Label.t -> Logs.Tag.set -> Logs.Tag.set
+    val create_by_label : Label.t -> Logs.Tag.set
+    val extend_by_label : Label.t -> Logs.Tag.set option -> Logs.Tag.set
   end
 end
 
@@ -122,27 +161,27 @@ module Config : sig
 end
 
 val query
-  :  Label.t
+  :  _ ctx
   -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
   -> 'a Lwt.t
 
 val collect
-  :  Label.t
+  :  _ ctx
   -> ('a, 'b, [< `Many | `One | `Zero ]) Caqti_request.t
   -> 'a
   -> 'b list Lwt.t
 
-val exec : Label.t -> ('a, unit, [< `Zero ]) Caqti_request.t -> 'a -> unit Lwt.t
-val find : Label.t -> ('a, 'b, [< `One ]) Caqti_request.t -> 'a -> 'b Lwt.t
+val exec : _ ctx -> ('a, unit, [< `Zero ]) Caqti_request.t -> 'a -> unit Lwt.t
+val find : _ ctx -> ('a, 'b, [< `One ]) Caqti_request.t -> 'a -> 'b Lwt.t
 
 val find_opt
-  :  Label.t
+  :  _ ctx
   -> ('a, 'b, [< `One | `Zero ]) Caqti_request.t
   -> 'a
   -> 'b option Lwt.t
 
 val populate
-  :  Label.t
+  :  _ ctx
   -> string
   -> string list
   -> 'a Caqti_type.t
@@ -150,14 +189,16 @@ val populate
   -> unit Lwt.t
 
 val transaction
-  :  ?setup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+  : _ ctx
+  -> ?setup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
   -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
-  -> Label.t
   -> (Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
   -> 'a Lwt.t
 
 val transaction_iter
-  :  Label.t
+  : _ ctx
+  -> ?setup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
+  -> ?cleanup:(Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
   -> (Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list
   -> unit Lwt.t
 
@@ -174,7 +215,7 @@ val exclude_ids
   -> 'a list
   -> (Dynparam.t, string option) CCPair.t
 
-val clean_all : Label.t -> unit Lwt.t
+val clean_all : _ ctx -> unit Lwt.t
 
 module Migration : sig
   exception Exception of string
@@ -228,7 +269,7 @@ module Migration : sig
       override this behaviour. *)
   val migrations_status
     :  ?migrations:t list
-    -> Label.t
+    -> _ ctx
     -> unit
     -> (string * int option) list Lwt.t
 
@@ -239,7 +280,7 @@ module Migration : sig
       whether there are too many, not enough or just the right number of
       migrations applied. If there are too many or not enough migrations
       applied, a descriptive warning message is logged. *)
-  val check_migrations_status : ?migrations:t list -> Label.t -> unit -> unit Lwt.t
+  val check_migrations_status : ?migrations:t list -> _ ctx -> unit -> unit Lwt.t
 
   (** [pending_migrations database_label ()] returns a list of migrations that need to be
       executed in order to have all migrations applied on the connection pool.
@@ -252,11 +293,11 @@ module Migration : sig
       database schema is up-to-date. *)
   val pending_migrations
     :  ?migrations:t list
-    -> Label.t
+    -> _ ctx
     -> unit
     -> (string * int) list Lwt.t
 
-  val start : Label.t -> unit -> unit Lwt.t
+  val start : _ ctx -> unit -> unit Lwt.t
   val extend_migrations : (string * steps) list -> unit -> (string * steps) list
 end
 

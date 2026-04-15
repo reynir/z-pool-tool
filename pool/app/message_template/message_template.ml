@@ -284,18 +284,19 @@ module AccountSuspensionNotification = struct
   let create ({ Pool_tenant.database_label; _ } as tenant) user =
     let open Message_utils in
     let open Utils.Lwt_result.Infix in
-    let%lwt system_languages = Settings.find_languages database_label in
+    Database.connection_ctx database_label @@ fun db_ctx ->
+    let%lwt system_languages = Settings.find_languages db_ctx in
     let email = user.Pool_user.email in
     let* language =
       match Pool_user.is_admin user with
       | true -> Lwt_result.return Pool_common.Language.En
       | false ->
         email
-        |> Contact.find_by_email database_label
+        |> Contact.find_by_email db_ctx
         >|+ contact_language system_languages
     in
-    let%lwt template = find_by_label_and_language_to_send database_label label language in
-    let%lwt sender = default_sender_of_pool database_label in
+    let%lwt template = find_by_label_and_language_to_send db_ctx label language in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let layout = layout_from_tenant tenant in
     let params = email_params layout user in
     let email = prepare_email language template sender email layout params in
@@ -330,12 +331,12 @@ module AssignmentCancellation = struct
   ;;
 
   let create ?follow_up_sessions tenant experiment session assignment =
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt sys_langs = Settings.find_languages pool in
+    Database.connection_ctx tenant.Pool_tenant.database_label @@ fun db_ctx ->
+    let%lwt sys_langs = Settings.find_languages db_ctx in
     let language = experiment_message_language sys_langs experiment assignment.contact in
-    let%lwt template = template pool experiment language in
+    let%lwt template = template db_ctx experiment language in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
     let params =
       email_params ?follow_up_sessions language layout experiment session assignment
@@ -374,12 +375,12 @@ module AssignmentConfirmation = struct
   ;;
 
   let prepare ?follow_up_sessions tenant contact experiment session =
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt sys_langs = Settings.find_languages pool in
+    Database.connection_ctx tenant.Pool_tenant.database_label @@ fun db_ctx ->
+    let%lwt sys_langs = Settings.find_languages db_ctx in
     let language = experiment_message_language sys_langs experiment contact in
-    let%lwt template = template pool experiment language in
+    let%lwt template = template db_ctx experiment language in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
     let fnc assignment =
       let params =
@@ -417,9 +418,9 @@ module AssignmentSessionChange = struct
   ;;
 
   let create message tenant experiment ~new_session ~old_session assignment =
-    let pool = tenant.Pool_tenant.database_label in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
     let params =
       email_params
@@ -450,24 +451,24 @@ module ContactEmailChangeAttempt = struct
 
   let create tenant user =
     let open Utils.Lwt_result.Infix in
-    let pool = tenant.Pool_tenant.database_label in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
     let* message_language =
-      let%lwt sys_langs = Settings.find_languages pool in
-      match%lwt Admin.user_is_admin pool user with
+      let%lwt sys_langs = Settings.find_languages db_ctx in
+      match%lwt Admin.user_is_admin db_ctx user with
       | true -> Lwt_result.return Pool_common.Language.En
       | false ->
-        let* contact = Contact.find_by_user pool user in
+        let* contact = Contact.find_by_user db_ctx user in
         contact_language sys_langs contact |> Lwt_result.return
     in
     let%lwt template =
       find_by_label_and_language_to_send
-        pool
+        db_ctx
         Label.ContactEmailChangeAttempt
         message_language
     in
     let layout = layout_from_tenant tenant in
     let tenant_url = tenant.Pool_tenant.url in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let email =
       prepare_email
         message_language
@@ -495,11 +496,11 @@ module ContactRegistrationAttempt = struct
   ;;
 
   let create message_language tenant user =
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt template = find_by_label_and_language_to_send pool label message_language in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
+    let%lwt template = find_by_label_and_language_to_send db_ctx label message_language in
     let layout = layout_from_tenant tenant in
     let tenant_url = tenant.Pool_tenant.url in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let email =
       prepare_email
         message_language
@@ -521,12 +522,12 @@ module EmailVerification = struct
     global_params layout contact.Contact.user @ [ "verificationUrl", validation_url ]
   ;;
 
-  let create pool language layout contact email_address token =
+  let create db_ctx language layout contact email_address token =
     let%lwt template =
-      find_by_label_and_language_to_send pool Label.EmailVerification language
+      find_by_label_and_language_to_send db_ctx Label.EmailVerification language
     in
     let layout = create_layout layout in
-    let%lwt url = Pool_tenant.Url.of_pool pool in
+    let%lwt url = Pool_tenant.Url.of_pool (Database.label_of_ctx db_ctx) in
     let validation_url =
       Pool_common.
         [ ( Pool_message.Field.Language
@@ -535,7 +536,7 @@ module EmailVerification = struct
         ]
       |> create_public_url_with_params url "/email-verified"
     in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let email =
       prepare_email
         language
@@ -560,17 +561,17 @@ module ExperimentInvitation = struct
 
   let prepare tenant experiment =
     let open Message_utils in
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt sys_langs = Settings.find_languages pool in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
+    let%lwt sys_langs = Settings.find_languages db_ctx in
     let%lwt templates =
       find_all_by_label_to_send
-        pool
+        db_ctx
         ~entity_uuids:[ Experiment.(Id.to_common experiment.Experiment.id) ]
         sys_langs
         Label.ExperimentInvitation
     in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let layout = layout_from_tenant tenant in
     let fnc ({ Invitation.contact; _ } as invitation) =
       let open CCResult in
@@ -599,11 +600,12 @@ module ExperimentInvitation = struct
         ({ Invitation.contact; _ } as invitation)
     =
     let open Message_utils in
-    let%lwt sys_langs = Settings.find_languages database_label in
+    let db_ctx = Database.label_ctx database_label in
+    let%lwt sys_langs = Settings.find_languages db_ctx in
     let language = experiment_message_language sys_langs experiment contact in
-    let%lwt template = find_by_label_and_language_to_send database_label label language in
+    let%lwt template = find_by_label_and_language_to_send db_ctx label language in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
-    let%lwt sender = sender_of_experiment database_label experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let layout = layout_from_tenant tenant in
     let params = email_params layout experiment contact in
     let email =
@@ -629,13 +631,13 @@ module InactiveContactWarning = struct
     @ [ "lastLogin", Pool_model.Time.formatted_date last_login ]
   ;;
 
-  let prepare pool =
+  let prepare db_ctx =
     let open Utils.Lwt_result.Infix in
     let open Message_utils in
-    let* tenant = Pool_tenant.find_by_label pool in
-    let%lwt sys_langs = Settings.find_languages pool in
-    let%lwt templates = find_all_by_label_to_send pool sys_langs label in
-    let%lwt sender = default_sender_of_pool pool in
+    let* tenant = Pool_tenant.find_by_db_ctx db_ctx in
+    let%lwt sys_langs = Settings.find_languages db_ctx in
+    let%lwt templates = find_all_by_label_to_send db_ctx sys_langs label in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let layout = layout_from_tenant tenant in
     let fnc (contact : Contact.t) =
       let open Utils.Lwt_result.Infix in
@@ -643,7 +645,7 @@ module InactiveContactWarning = struct
       let* lang, template =
         find_template_by_language templates message_language |> Lwt_result.lift
       in
-      let%lwt last_login = Contact.find_last_signin_at pool contact in
+      let%lwt last_login = Contact.find_last_signin_at db_ctx contact in
       let params = email_params layout contact ~last_login in
       let email =
         prepare_email lang template sender (Contact.email_address contact) layout params
@@ -659,13 +661,13 @@ module InactiveContactDeactivation = struct
   let label = Label.InactiveContactDeactivation
   let email_params layout contact = global_params layout contact.Contact.user
 
-  let prepare pool =
+  let prepare db_ctx =
     let open Utils.Lwt_result.Infix in
     let open Message_utils in
-    let* tenant = Pool_tenant.find_by_label pool in
-    let%lwt sys_langs = Settings.find_languages pool in
-    let%lwt templates = find_all_by_label_to_send pool sys_langs label in
-    let%lwt sender = default_sender_of_pool pool in
+    let* tenant = Pool_tenant.find_by_db_ctx db_ctx in
+    let%lwt sys_langs = Settings.find_languages db_ctx in
+    let%lwt templates = find_all_by_label_to_send db_ctx sys_langs label in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let layout = layout_from_tenant tenant in
     let fnc (contact : Contact.t) =
       let open CCResult in
@@ -721,10 +723,10 @@ module ManualSessionMessage = struct
   ;;
 
   let prepare tenant session =
-    let pool = tenant.Pool_tenant.database_label in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
     let experiment = session.Session.experiment in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let smtp_auth_id = experiment.Experiment.smtp_auth_id in
     Lwt.return
     @@ fun assignment message ->
@@ -740,7 +742,8 @@ module ManualSessionMessage = struct
 
   let prepare_text_message (tenant : Pool_tenant.t) session =
     let experiment = session.Session.experiment in
-    let%lwt gtx_config = Gtx_config.find_exn tenant.Pool_tenant.database_label in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
+    let%lwt gtx_config = Gtx_config.find_exn db_ctx in
     let open Text_message in
     let fnc language assignment message cell_phone =
       let params =
@@ -766,10 +769,10 @@ module MatcherNotification = struct
   ;;
 
   let create tenant language experiment admin =
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt template = find_by_label_and_language_to_send pool label language in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
+    let%lwt template = find_by_label_and_language_to_send db_ctx label language in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let params = email_params layout (Admin.user admin) experiment in
     let email_address = Admin.email_address admin in
     let email = prepare_email language template sender email_address layout params in
@@ -818,11 +821,11 @@ module MatchFilterUpdateNotification = struct
   let template pool language = find_by_label_and_language_to_send pool label language
 
   let create tenant trigger admin experiment assignments =
-    let pool = tenant.Pool_tenant.database_label in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
     let language = Pool_common.Language.En in
-    let%lwt template = template pool language in
+    let%lwt template = template db_ctx language in
     let layout = layout_from_tenant tenant in
-    let%lwt sender = sender_of_experiment pool experiment in
+    let%lwt sender = sender_of_experiment db_ctx experiment in
     let params =
       email_params layout language trigger (Admin.user admin) experiment assignments
     in
@@ -839,11 +842,11 @@ module PasswordChange = struct
   let label = Label.PasswordChange
 
   let create language tenant user =
-    let pool = tenant.Pool_tenant.database_label in
-    let%lwt template = find_by_label_and_language_to_send pool label language in
+    let db_ctx = Database.label_ctx tenant.Pool_tenant.database_label in
+    let%lwt template = find_by_label_and_language_to_send db_ctx label language in
     let layout = layout_from_tenant tenant in
     let email_address = Pool_user.email user in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let email =
       prepare_email
         language
@@ -865,21 +868,22 @@ module PasswordReset = struct
     global_params layout user @ [ "resetUrl", reset_url ]
   ;;
 
-  let create pool language layout user =
+  let create db_ctx language layout user =
     let open Utils.Lwt_result.Infix in
+    let pool = Database.label_of_ctx db_ctx in
     let email = Pool_user.email user in
     let%lwt template =
-      find_by_label_and_language_to_send pool Label.PasswordReset language
+      find_by_label_and_language_to_send db_ctx Label.PasswordReset language
     in
     let%lwt url = Pool_tenant.Url.of_pool pool in
-    let%lwt sender = default_sender_of_pool pool in
+    let%lwt sender = default_sender_of_pool db_ctx in
     let open Pool_common in
     let* reset_token =
-      Pool_user.Password.Reset.create_token pool email
+      Pool_user.Password.Reset.create_token db_ctx email
       ||> function
       | None ->
         Logs.err ~src (fun m ->
-          m ~tags:(Database.Logger.Tags.create pool) "Reset token not found");
+          m ~tags:(Database.Logger.Tags.create db_ctx) "Reset token not found");
         Error Pool_message.Error.PasswordResetFailMessage
       | Some token -> Ok token
     in
@@ -914,13 +918,12 @@ module PhoneVerification = struct
   let create_text_message
         pool
         message_language
-        (tenant : Pool_tenant.t)
         contact
         cell_phone
         token
     =
     let open Text_message in
-    let%lwt gtx_config = Gtx_config.find_exn tenant.Pool_tenant.database_label in
+    let%lwt gtx_config = Gtx_config.find_exn pool in
     let%lwt { sms_text; _ } =
       find_by_label_and_language_to_send pool label message_language
     in
@@ -950,7 +953,7 @@ module ProfileUpdateTrigger = struct
     let%lwt templates =
       find_all_by_label_to_send pool sys_langs Label.SessionReschedule
     in
-    let%lwt url = Pool_tenant.Url.of_pool pool in
+    let%lwt url = Pool_tenant.Url.of_pool (Database.label_of_ctx pool) in
     let%lwt sender = default_sender_of_pool pool in
     let layout = layout_from_tenant tenant in
     let fnc contact =
@@ -1223,7 +1226,7 @@ module SignUpVerification = struct
         user_id
     =
     let%lwt template = find_by_label_and_language_to_send pool label language in
-    let%lwt url = Pool_tenant.Url.of_pool pool in
+    let%lwt url = Pool_tenant.Url.of_pool (Database.label_of_ctx pool) in
     let%lwt sender = default_sender_of_pool pool in
     let verification_url =
       let params =
@@ -1291,7 +1294,7 @@ module UserImport = struct
            (CCList.iter (fun ({ Entity.language; _ } as t) ->
               Hashtbl.add templates language t))
     in
-    let%lwt url = Pool_tenant.Url.of_pool pool in
+    let%lwt url = Pool_tenant.Url.of_pool (Database.label_of_ctx pool) in
     let%lwt default_language = Settings.default_language pool in
     let%lwt sender = default_sender_of_pool pool in
     let layout = layout_from_tenant tenant in
@@ -1338,16 +1341,17 @@ module WaitingListConfirmation = struct
   let create ({ Pool_tenant.database_label; _ } as tenant) contact experiment =
     let open Utils.Lwt_result.Infix in
     let open Message_utils in
-    let%lwt system_languages = Settings.find_languages database_label in
+    let db_ctx = Database.label_ctx database_label in
+    let%lwt system_languages = Settings.find_languages db_ctx in
     let language =
       public_experiment_message_language system_languages experiment contact
     in
-    let* sender = sender_of_public_experiment database_label experiment in
+    let* sender = sender_of_public_experiment db_ctx experiment in
     let layout = layout_from_tenant tenant in
     let%lwt template =
       find_by_label_and_language_to_send
         ~entity_uuids:Experiment.[ experiment |> Public.id |> Id.to_common ]
-        database_label
+        db_ctx
         label
         language
     in

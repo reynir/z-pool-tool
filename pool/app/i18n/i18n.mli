@@ -57,25 +57,25 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : Database.Label.t -> event -> unit Lwt.t
-val find : Database.Label.t -> Pool_common.Id.t -> t Lwt.t
-val find_with_default_content : Database.Label.t -> Pool_common.Id.t -> t Lwt.t
-val find_by_key : Database.Label.t -> Key.t -> Pool_common.Language.t -> t Lwt.t
+val handle_event : Database.ctx -> event -> unit Lwt.t
+val find : Database.ctx -> Pool_common.Id.t -> t Lwt.t
+val find_with_default_content : Database.ctx -> Pool_common.Id.t -> t Lwt.t
+val find_by_key : Database.ctx -> Key.t -> Pool_common.Language.t -> t Lwt.t
 
 val find_by_key_opt
-  :  Database.Label.t
+  :  Database.ctx
   -> Key.t
   -> Pool_common.Language.t
   -> t option Lwt.t
 
-val find_all : Database.Label.t -> unit -> t list Lwt.t
-val terms_and_conditions_last_updated : Database.Label.t -> Ptime.t Lwt.t
+val find_all : Database.ctx -> unit -> t list Lwt.t
+val terms_and_conditions_last_updated : Database.ctx -> Ptime.t Lwt.t
 
 module I18nCache : sig
   val clear : unit -> unit
 end
 
-val privacy_policy_is_set : Database.Label.t -> Pool_common.Language.t -> bool Lwt.t
+val privacy_policy_is_set : Database.ctx -> Pool_common.Language.t -> bool Lwt.t
 
 module Guard : sig
   module Target : sig

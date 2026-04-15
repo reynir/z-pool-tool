@@ -50,26 +50,26 @@ val user_is_confirmed : 'email t -> bool
 val create : Pool_user.EmailAddress.t -> Pool_user.t -> Pool_token.t -> unverified t
 
 val find_unverified_by_user
-  :  Database.Label.t
+  :  Database.ctx
   -> Pool_common.Id.t
   -> (unverified t, Pool_message.Error.t) Lwt_result.t
 
 val find_verified_by_user
-  :  Database.Label.t
+  :  Database.ctx
   -> Pool_common.Id.t
   -> (verified t, Pool_message.Error.t) Lwt_result.t
 
 val find_unverified_by_address
-  :  Database.Label.t
+  :  Database.ctx
   -> Pool_user.EmailAddress.t
   -> (unverified t, Pool_message.Error.t) Lwt_result.t
 
-val delete_unverified_by_user : Database.Label.t -> Pool_user.Id.t -> unit Lwt.t
+val delete_unverified_by_user : Database.ctx -> Pool_user.Id.t -> unit Lwt.t
 val token_data : Pool_user.EmailAddress.t -> (string * string) list
-val create_token : Database.Label.t -> Pool_user.EmailAddress.t -> Pool_token.t Lwt.t
+val create_token : Database.ctx -> Pool_user.EmailAddress.t -> Pool_token.t Lwt.t
 
 val find_active_token
-  :  Database.Label.t
+  :  Database.ctx
   -> Pool_user.EmailAddress.t
   -> Pool_token.t option Lwt.t
 
@@ -175,14 +175,14 @@ module SmtpAuth : sig
       -> (t, Pool_message.Error.t) result
   end
 
-  val find : Database.Label.t -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-  val find_by_label : Database.Label.t -> Label.t -> t option Lwt.t
-  val find_full : Database.Label.t -> Id.t -> (Write.t, Pool_message.Error.t) Lwt_result.t
-  val find_default : Database.Label.t -> (t, Pool_message.Error.t) Lwt_result.t
-  val find_default_opt : Database.Label.t -> t option Lwt.t
-  val find_all : Database.Label.t -> t list Lwt.t
-  val find_by : Query.t -> Database.Label.t -> (t list * Query.t) Lwt.t
-  val defalut_is_set : Database.Label.t -> bool Lwt.t
+  val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+  val find_by_label : Database.ctx -> Label.t -> t option Lwt.t
+  val find_full : Database.ctx -> Id.t -> (Write.t, Pool_message.Error.t) Lwt_result.t
+  val find_default : Database.ctx -> (t, Pool_message.Error.t) Lwt_result.t
+  val find_default_opt : Database.ctx -> t option Lwt.t
+  val find_all : Database.ctx -> t list Lwt.t
+  val find_by : Query.t -> Database.ctx -> (t list * Query.t) Lwt.t
+  val defalut_is_set : Database.ctx -> bool Lwt.t
   val column_label : Query.Column.t
   val column_smtp_server : Query.Column.t
   val column_smtp_username : Query.Column.t
@@ -198,7 +198,7 @@ end
 module Service : sig
   module Cache : sig
     val clear : unit -> unit
-    val find_default : Database.Label.t -> SmtpAuth.Write.t option
+    val find_default : Database.ctx -> SmtpAuth.Write.t option
   end
 
   module Smtp : sig
@@ -215,7 +215,7 @@ module Service : sig
     val clear_inbox : unit -> unit
 
     val prepare
-      :  Database.Label.t
+      :  Database.ctx
       -> ?smtp_auth_id:SmtpAuth.Id.t
       -> Sihl_email.t
       -> prepared Lwt.t
@@ -240,7 +240,7 @@ module Service : sig
     val send : t Pool_queue.Job.t
   end
 
-  val default_sender_of_pool : Database.Label.t -> Pool_user.EmailAddress.t Lwt.t
+  val default_sender_of_pool : Database.ctx -> Pool_user.EmailAddress.t Lwt.t
   val intercept_prepare : Job.t -> (Job.t, Pool_message.Error.t) result
 
   val dispatch
@@ -249,12 +249,12 @@ module Service : sig
     -> ?new_smtp_auth_id:Pool_common.Id.t
     -> ?message_template:string
     -> ?job_ctx:Pool_queue.job_ctx
-    -> Database.Label.t
+    -> Database.ctx
     -> Job.t
     -> unit Lwt.t
 
   val dispatch_all
-    :  Database.Label.t
+    :  Database.ctx
     -> (Pool_queue.Id.t * Job.t * string option * Pool_queue.job_ctx option) list
     -> unit Lwt.t
 
@@ -262,7 +262,7 @@ module Service : sig
   val register : unit -> Sihl.Container.Service.t
 
   val test_smtp_config
-    :  Database.Label.t
+    :  Database.ctx
     -> SmtpAuth.Write.t
     -> Pool_user.EmailAddress.t
     -> (unit, Pool_message.Error.t) Lwt_result.t
@@ -284,7 +284,7 @@ type verification_event =
   | Created of Pool_user.EmailAddress.t * Pool_token.t * Pool_user.Id.t
   | EmailVerified of unverified t
 
-val handle_verification_event : Database.Label.t -> verification_event -> unit Lwt.t
+val handle_verification_event : Database.ctx -> verification_event -> unit Lwt.t
 val equal_verification_event : verification_event -> verification_event -> bool
 val pp_verification_event : Format.formatter -> verification_event -> unit
 
@@ -318,7 +318,7 @@ type event =
   | SmtpDeleted of SmtpAuth.Id.t
   | SmtpPasswordEdited of SmtpAuth.update_password
 
-val handle_event : Database.Label.t -> event -> unit Lwt.t
+val handle_event : Database.ctx -> event -> unit Lwt.t
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string

@@ -13,11 +13,22 @@ module Url = struct
   let of_pool = Repo_entity.Url.of_pool
 end
 
-let find = Repo.find Database.Pool.Root.label
-let find_full = Repo.find_full Database.Pool.Root.label
-let find_by_label = Repo.find_by_label Database.Pool.Root.label
-let find_by_url ?should_cache = Repo.find_by_url ?should_cache Database.Pool.Root.label
-let find_all = Repo.find_all Database.Pool.Root.label
+let find id =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Repo.find db_ctx id
+let find_full id =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Repo.find_full db_ctx id
+let find_by_label label =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Repo.find_by_label db_ctx label
+let find_by_db_ctx db_ctx = find_by_label (Database.label_of_ctx db_ctx)
+let find_by_url ?should_cache url =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Repo.find_by_url ?should_cache db_ctx url
+let find_all () =
+  Database.(connection_ctx Pool.Root.label) @@ fun db_ctx ->
+  Repo.find_all db_ctx ()
 
 let create_public_url pool_url =
   Sihl.Web.externalize_path %> Format.asprintf "https://%s%s" (Url.value pool_url)

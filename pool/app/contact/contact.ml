@@ -10,8 +10,8 @@ let find_by_user pool (user : Pool_user.t) =
   user.Pool_user.id |> Id.of_user |> Repo.find pool
 ;;
 
-let has_terms_accepted pool (contact : t) =
-  let%lwt last_updated = I18n.terms_and_conditions_last_updated pool in
+let has_terms_accepted db_ctx (contact : t) =
+  let%lwt last_updated = I18n.terms_and_conditions_last_updated db_ctx in
   let terms_accepted_at =
     contact.terms_accepted_at |> CCOption.map Pool_user.TermsAccepted.value
   in

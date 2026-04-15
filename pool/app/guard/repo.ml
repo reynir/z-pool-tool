@@ -351,11 +351,13 @@ module Cache = struct
      updated/removed (Issue: https://github.com/uzh/guardian/issues/11) *)
   open CCCache
 
-  let equal_find_actor (l1, a1) (l2, a2) =
+  let equal_find_actor (ctx1, a1) (ctx2, a2) =
+    let l1 = Database.label_of_ctx ctx1 and l2 = Database.label_of_ctx ctx2 in
     Database.Label.equal l1 l2 && Core.Uuid.Actor.equal a1 a2
   ;;
 
-  let equal_validation (l1, s1, any1, a1) (l2, s2, any2, a2) =
+  let equal_validation (ctx1, s1, any1, a1) (ctx2, s2, any2, a2) =
+    let l1 = Database.label_of_ctx ctx1 and l2 = Database.label_of_ctx ctx2 in
     Database.Label.equal l1 l2
     && Core.ValidationSet.equal s1 s2
     && CCBool.equal any1 any2
@@ -381,23 +383,23 @@ end
 module Actor = struct
   include Actor
 
-  let find database_label id =
+  let find db_ctx id =
     let cb ~in_cache _ _ =
       if in_cache
       then (
-        let tags = create_tag database_label in
+        let tags = create_tag db_ctx in
         Logs.debug ~src (fun m ->
           m ~tags "Found in cache: Actor %s" (id |> Core.Uuid.Actor.to_string)))
       else Cache.log_cache_size Cache.lru_find_actor "lru_find_actor"
     in
     let find' (label, id) = find ~ctx:(Database.to_ctx label) id in
-    (database_label, id) |> CCCache.(with_cache ~cb Cache.lru_find_actor find')
+    (db_ctx, id) |> CCCache.(with_cache ~cb Cache.lru_find_actor find')
   ;;
 
-  let can_assign_roles database_label actor =
+  let can_assign_roles db_ctx actor =
     let open Utils.Lwt_result.Infix in
     ActorRole.permissions_of_actor
-      ~ctx:(Database.to_ctx database_label)
+      ~ctx:(Database.to_ctx db_ctx)
       actor.Core.Actor.uuid
     ||> CCList.filter_map
           (fun { Core.PermissionOnTarget.permission; model; target_uuid } ->
@@ -418,8 +420,8 @@ module Actor = struct
              else None)
   ;;
 
-  let validate_assign_role database_label actor role =
-    let%lwt possible_assigns = can_assign_roles database_label actor in
+  let validate_assign_role db_ctx actor role =
+    let%lwt possible_assigns = can_assign_roles db_ctx actor in
     let eq (r1, u1) (r2, u2) =
       Role.Role.equal r1 r2
       && (CCOption.(map2 Core.Uuid.Target.equal u1 u2 |> value ~default:false)
@@ -472,30 +474,30 @@ module ActorRole = struct
          ->* Caqti_type.(t3 ActorRole.t (option TargetModel.t) (option string)))
   ;;
 
-  let find_by_actor database_label actor =
+  let find_by_actor db_ctx actor =
     let cb ~in_cache _ _ =
       if in_cache
       then (
-        let tags = create_tag database_label in
+        let tags = create_tag db_ctx in
         Logs.debug ~src (fun m ->
           m ~tags "Found in cache: Actor %s" (actor |> Core.Uuid.Actor.to_string)))
       else Cache.log_cache_size Cache.lru_find_by_actor "lru_find_by_actor"
     in
-    let find_by_actor' (label, actor) =
-      Database.collect label find_by_actor_request actor
+    let find_by_actor' (ctx, actor) =
+      Database.collect ctx find_by_actor_request actor
     in
-    (database_label, actor)
+    (db_ctx, actor)
     |> CCCache.(with_cache ~cb Cache.lru_find_by_actor find_by_actor')
   ;;
 
-  let permissions_of_actor database_label =
-    permissions_of_actor ~ctx:(Database.to_ctx database_label)
+  let permissions_of_actor db_ctx =
+    permissions_of_actor ~ctx:(Database.to_ctx db_ctx)
   ;;
 end
 
 let validate
       ?(any_id = false)
-      database_label
+      db_ctx
       validation_set
       ({ Core.Actor.uuid; _ } as actor)
   =
@@ -504,7 +506,7 @@ let validate
     then
       Logs.debug ~src (fun m ->
         m
-          ~tags:(create_tag database_label)
+          ~tags:(create_tag db_ctx)
           "Found in cache: Actor %s\nValidation set %s"
           (uuid |> Core.Uuid.Actor.to_string)
           ([%show: Core.ValidationSet.t] validation_set))
@@ -518,7 +520,7 @@ let validate
       set
       actor
   in
-  (database_label, validation_set, any_id, actor)
+  (db_ctx, validation_set, any_id, actor)
   |> CCCache.(with_cache ~cb Cache.lru_validation validate')
 ;;
 

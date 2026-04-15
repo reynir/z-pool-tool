@@ -368,6 +368,29 @@ module Sql = struct
     ]
   ;;
 
+  let in_transaction_sql =
+    let open Caqti_request.Infix in
+    {sql|select @@in_transaction|sql}
+    |> Caqti_type.unit ->! Caqti_type.bool
+
+  let transaction db_ctx ?(setup=[]) ?(cleanup=[]) query =
+    Database.query db_ctx @@ fun ((module Connection : Caqti_lwt.CONNECTION) as connection) ->
+    let open Utils.Lwt_result.Infix in
+    let apply_all conn fns =
+      List.fold_left (fun acc fn -> acc >>= fun () -> fn conn) (Lwt_result.return ()) fns
+    in
+    let fn () =
+      apply_all connection setup >>= fun () ->
+      query connection >>= fun result ->
+      apply_all connection cleanup >>= fun () ->
+      Lwt_result.return result
+    in
+    Connection.find in_transaction_sql () >>= fun in_transaction ->
+    if in_transaction then
+      fn ()
+    else
+      Connection.with_transaction fn
+
   let prepare_use_case_joins dyn =
     let open Dynparam in
     let invitation_join =
@@ -414,7 +437,7 @@ module Sql = struct
       let (module Connection : Caqti_lwt.CONNECTION) = connection in
       Connection.collect_list request pv
     in
-    Database.transaction
+    transaction
       pool
       ~setup:(drop_temp_table :: create_temp_tables template_list filter)
       ~cleanup:[ drop_temp_table ]
@@ -448,15 +471,23 @@ module Sql = struct
     in
     let open Caqti_request.Infix in
     let request = sql |> find_sql |> pt ->? Caqti_type.int in
-    let matches_filter_request connection =
-      let (module Connection : Caqti_lwt.CONNECTION) = connection in
-      Connection.find_opt request pv
-    in
-    Database.transaction
-      pool
-      ~setup:(drop_temp_table :: create_temp_tables template_list (Some query))
-      ~cleanup:[ drop_temp_table ]
-      matches_filter_request
+    Database.query pool
+      (fun ((module Conn : Caqti_lwt.CONNECTION) as conn) ->
+         let fn () =
+           let open Utils.Lwt_result.Infix in
+           drop_temp_table conn >>= fun () ->
+           List.fold_left
+             (fun acc fn ->
+                acc >>= fun () ->
+                fn conn)
+             (Lwt_result.return ())
+             (create_temp_tables template_list (Some query)) >>= fun () ->
+           Conn.find_opt request pv >>= fun result ->
+           drop_temp_table conn >>= fun () ->
+           Lwt_result.return result
+         in
+         Conn.with_transaction fn
+      )
     ||> CCOption.map_or ~default (CCInt.equal 1)
   ;;
 
@@ -519,7 +550,7 @@ module Sql = struct
       let (module Connection : Caqti_lwt.CONNECTION) = connection in
       Connection.find_opt request pv
     in
-    Database.transaction
+    transaction
       pool
       ~setup:(drop_temp_table :: create_temp_tables template_list filter)
       ~cleanup:[ drop_temp_table ]

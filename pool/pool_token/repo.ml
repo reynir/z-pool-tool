@@ -74,7 +74,7 @@ let lifecycles = [ Pool_database.lifecycle ]
 
 let label =
   let open CCFun.Infix in
-  CCOption.(map Database.of_ctx_exn %> get_exn_or "Database: Invalid context")
+  CCOption.(map Database.Label.of_ctx_exn %> get_exn_or "Database: Invalid context")
 ;;
 
 let sql_select_columns =
@@ -201,7 +201,7 @@ module Sql = struct
     "TRUNCATE token_tokens" |> Caqti_type.(unit ->. unit)
   ;;
 
-  let clean label () = Database.exec label clean_request ()
+  let clean label () = Database.exec (Database.label_ctx label) clean_request ()
 end
 
 module Migration = struct
@@ -251,7 +251,7 @@ end
 let register_migration () = Database.Migration.register_migration (Migration.migration ())
 
 let register_cleaner () =
-  Sihl.Cleaner.register_cleaner (fun ?(ctx = []) -> Sql.clean (Database.of_ctx_exn ctx))
+  Sihl.Cleaner.register_cleaner (fun ?(ctx = []) -> Sql.clean (Database.Label.of_ctx_exn ctx))
 ;;
 
 let find = Sql.find

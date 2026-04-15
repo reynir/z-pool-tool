@@ -42,9 +42,9 @@ let map_or ~tags ~default fcn =
   | Ok value -> fcn value
 ;;
 
-let handle_event ~tags pool : event -> unit Lwt.t =
+let handle_event ~tags db_ctx : event -> unit Lwt.t =
   let open Utils.Lwt_result.Infix in
-  let ctx = Database.to_ctx pool in
+  let ctx = Database.to_ctx db_ctx in
   let admin_authorizable ?(roles = []) admin =
     let open Guard in
     let open Common.Utils in
@@ -65,7 +65,7 @@ let handle_event ~tags pool : event -> unit Lwt.t =
     let%lwt admin =
       let id = CCOption.map Id.to_user id in
       User.create_admin
-        pool
+        db_ctx
         ?id
         email
         lastname
@@ -76,7 +76,7 @@ let handle_event ~tags pool : event -> unit Lwt.t =
       >|- with_log_error ~src ~tags
       ||> get_or_failwith
     in
-    let%lwt () = Repo.insert pool admin in
+    let%lwt () = Repo.insert db_ctx admin in
     let () = Guard.Persistence.clear_cache () in
     let%lwt (_ : Guard.Target.t) =
       Entity_guard.Target.to_authorizable ~ctx admin
@@ -85,24 +85,24 @@ let handle_event ~tags pool : event -> unit Lwt.t =
     in
     admin_authorizable ~roles admin
   | DetailsUpdated (admin, { firstname; lastname }) ->
-    let%lwt (_ : Pool_user.t) = User.update pool ~lastname ~firstname (user admin) in
+    let%lwt (_ : Pool_user.t) = User.update db_ctx ~lastname ~firstname (user admin) in
     Lwt.return_unit
   | EmailVerified admin ->
-    let%lwt (_ : Pool_user.t) = User.confirm pool admin.user in
+    let%lwt (_ : Pool_user.t) = User.confirm db_ctx admin.user in
     { admin with email_verified = Some (Pool_user.EmailVerified.create_now ()) }
-    |> Repo.update pool
+    |> Repo.update db_ctx
   | ImportConfirmed (admin, password) ->
     let (_ : (unit, Pool_message.Error.t) Lwt_result.t) =
       User.Password.define
-        pool
+        db_ctx
         (admin |> user |> Pool_user.id)
         password
         (Pool_user.Password.to_confirmed password)
       >|- Pool_common.Utils.with_log_error ~src ~tags
     in
-    Repo.update pool { admin with import_pending = Pool_user.ImportPending.create false }
+    Repo.update db_ctx { admin with import_pending = Pool_user.ImportPending.create false }
   | ImportDisabled admin ->
-    Repo.update pool { admin with import_pending = Pool_user.ImportPending.create false }
+    Repo.update db_ctx { admin with import_pending = Pool_user.ImportPending.create false }
   | PromotedContact contact_id ->
     let target =
       Guard.Persistence.Target.find
@@ -113,14 +113,14 @@ let handle_event ~tags pool : event -> unit Lwt.t =
     target
     >|- Pool_message.Error.nothandled
     >|> map_or ~tags ~default (fun { Guard.Target.uuid; _ } ->
-      let%lwt () = Repo.promote_contact pool contact_id in
+      let%lwt () = Repo.promote_contact db_ctx contact_id in
       let%lwt () = Guard.Persistence.Target.promote ~ctx uuid `Admin in
       let%lwt () =
-        Repo.find pool (Id.of_user contact_id)
+        Repo.find db_ctx (Id.of_user contact_id)
         >|> map_or ~tags ~default admin_authorizable
       in
       Lwt.return_unit)
-  | SignInCounterUpdated m -> Repo.update_sign_in_count pool m
+  | SignInCounterUpdated m -> Repo.update_sign_in_count db_ctx m
   | Disabled _ -> Utils.todo ()
   | Enabled _ -> Utils.todo ()
 [@@deriving eq, show]

@@ -82,7 +82,7 @@ module type TSig = sig
     -> Write.t option
 
   val insert
-    :  Database.Label.t
+    :  Database.ctx
     -> ?user_uuid:Pool_common.Id.t
     -> entity_uuid:Pool_common.Id.t
     -> before:record

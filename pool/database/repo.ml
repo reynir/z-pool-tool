@@ -102,7 +102,7 @@ let insert_request =
   |> t ->. Caqti_type.unit
 ;;
 
-let insert = flip Service.exec insert_request
+let insert ctx = Service.exec ctx insert_request
 
 let update_request =
   {sql|
@@ -154,7 +154,7 @@ let set_migration_pending db_labels =
          |> CCString.concat ",")
       |> pt ->. Caqti_type.unit
     in
-    Service.exec root request pv
+    Service.exec (Entity.Label root) request pv
 ;;
 
 let database_status_by_label_request =
@@ -165,5 +165,5 @@ let database_status_by_label_request =
 ;;
 
 let database_status_by_label db_label =
-  Service.find_opt root database_status_by_label_request db_label
+  Service.find_opt (Entity.Label root) database_status_by_label_request db_label
 ;;

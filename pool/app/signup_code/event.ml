@@ -5,7 +5,7 @@ type event =
   | Verified of Code.t
 [@@deriving eq, show, variants]
 
-let handle_event pool : event -> unit Lwt.t = function
-  | SignedUp code -> Repo.insert pool `Signup code
-  | Verified code -> Repo.insert pool `Verification code
+let handle_event db_ctx : event -> unit Lwt.t = function
+  | SignedUp code -> Repo.insert db_ctx `Signup code
+  | Verified code -> Repo.insert db_ctx `Verification code
 ;;

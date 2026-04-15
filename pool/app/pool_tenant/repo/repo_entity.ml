@@ -37,7 +37,8 @@ module Url = struct
 
   let of_pool pool =
     let open Utils.Lwt_result.Infix in
-    Database.find_opt Database.Pool.Root.label find_url_request pool
+    Database.connection_ctx Database.Pool.Root.label @@ fun db_ctx ->
+    Database.find_opt db_ctx find_url_request pool
     ||> function
     | None ->
       Sihl.Configuration.read_string "PUBLIC_URL"

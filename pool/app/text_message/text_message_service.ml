@@ -47,7 +47,7 @@ end
 let get_api_key_and_url database_label =
   let%lwt { Gtx_config.api_key; _ } = Gtx_config.find_exn database_label in
   let%lwt { Pool_tenant.url; _ } =
-    Pool_tenant.find_by_label database_label ||> Pool_common.Utils.get_or_failwith
+    Pool_tenant.find_by_db_ctx database_label ||> Pool_common.Utils.get_or_failwith
   in
   Lwt.return (api_key, url)
 ;;
@@ -223,8 +223,9 @@ module Job = struct
 
   let handle ?id database_label message =
     let open Sihl.Configuration in
-    let%lwt api_key, tenant_url = get_api_key_and_url database_label in
-    let tags = tags database_label in
+    let db_ctx = Database.label_ctx database_label in
+    let%lwt api_key, tenant_url = get_api_key_and_url db_ctx in
+    let tags = tags db_ctx in
     match is_production () || bypass () with
     | true ->
       let open Cohttp in

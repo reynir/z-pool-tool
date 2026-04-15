@@ -48,10 +48,10 @@ type event =
 val equal_event : event -> event -> bool
 val show_event : event -> string
 val pp_event : Format.formatter -> event -> unit
-val handle_event : Database.Label.t -> event -> unit Lwt.t
+val handle_event : Database.ctx -> event -> unit Lwt.t
 
 val find_valid_by_id
-  :  Database.Label.t
+  :  Database.ctx
   -> Id.t
   -> (t * Pool_user.t, Pool_message.Error.t) Lwt_result.t
 

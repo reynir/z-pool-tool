@@ -160,33 +160,33 @@ module History : sig
   val sort : item list -> item list
 end
 
-val find : Database.Label.t -> Id.t -> (Instance.t, Pool_message.Error.t) Lwt_result.t
+val find : Database.ctx -> Id.t -> (Instance.t, Pool_message.Error.t) Lwt_result.t
 
 val find_by
   :  [< `Current | `History ]
   -> ?query:Query.t
-  -> Database.Label.t
+  -> Database.ctx
   -> (Instance.t list * Query.t) Lwt.t
 
 val find_instances_by_entity
   :  [< `Current | `History ]
   -> ?query:Query.t
-  -> Database.Label.t
+  -> Database.ctx
   -> History.item
   -> (Instance.t list * Query.t) Lwt.t
 
 val find_related
-  :  Database.Label.t
+  :  Database.ctx
   -> Instance.t
   -> History.model
   -> Pool_common.Id.t option Lwt.t
 
 val count_workable
   :  JobName.t
-  -> Database.Label.t
+  -> Database.ctx
   -> (int, Pool_message.Error.t) result Lwt.t
 
-val count_all_workable : Database.Label.t -> (int, Pool_message.Error.t) result Lwt.t
+val count_all_workable : Database.ctx -> (int, Pool_message.Error.t) result Lwt.t
 
 include Repo.ColumnsSig
 
@@ -208,7 +208,7 @@ val dispatch
   -> ?message_template:string
   -> ?job_ctx:job_ctx
   -> ?run_at:run_at
-  -> Database.Label.t
+  -> Database.ctx
   -> 'a
   -> 'a Job.t
   -> unit Lwt.t
@@ -216,7 +216,7 @@ val dispatch
 val dispatch_all
   :  ?callback:(Instance.t -> unit Lwt.t)
   -> ?run_at:run_at
-  -> Database.Label.t
+  -> Database.ctx
   -> (Id.t * 'a * string option * job_ctx) list
   -> 'a Job.t
   -> unit Lwt.t

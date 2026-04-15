@@ -1,6 +1,5 @@
 open CCFun
 open Entity
-open Utils.Lwt_result.Infix
 
 exception Exception of string
 
@@ -165,8 +164,8 @@ module Make (Config : Pools_sig.ConfigSig) = struct
         Cache.remove name |> Lwt.return
     ;;
 
-    let initialize ?(additinal_pools : Entity.t list = []) () : unit =
-      Config.database :: additinal_pools
+    let initialize ?additinal_pools:(additional_pools : Entity.t list = []) () : unit =
+      Config.database :: additional_pools
       |> CCList.filter (label %> Cache.find_opt %> CCOption.is_none)
       |> CCList.iter (create ~required:true %> Cache.replace)
     ;;
@@ -224,7 +223,7 @@ module Make (Config : Pools_sig.ConfigSig) = struct
       create ?required database |> Cache.replace |> Lwt.return
     ;;
 
-    let raise_caqti_error (label : Entity.Label.t) input =
+    let raise_caqti_error_labelled (label : Entity.Label.t) input =
       let open Caqti_error in
       match%lwt input with
       | Ok resp -> Lwt.return resp
@@ -243,7 +242,7 @@ module Make (Config : Pools_sig.ConfigSig) = struct
       | Some ({ n_retries; _ } as pool) ->
         (match connection pool with
          | Fail err when n_retries >= retries ->
-           raise_caqti_error (database_label pool) (Error err |> Lwt_result.lift)
+           raise_caqti_error_labelled (database_label pool) (Error err |> Lwt_result.lift)
          | Fail _ ->
            let () = connect_base pool |> increment_retry |> Cache.replace in
            fetch ~retries label
@@ -260,15 +259,27 @@ module Make (Config : Pools_sig.ConfigSig) = struct
       | None -> raise Pool_message.Error.(Exn (DatabaseAddPoolFirst label))
     ;;
 
-    let map_fetched ?retries database_label (fcn : 'a -> ('b, 'e) Lwt_result.t) =
-      let%lwt connection = fetch ?retries database_label in
-      fcn connection |> raise_caqti_error database_label
-    ;;
+    let map_fetched (type maybe_transaction) ?retries (ctx : maybe_transaction Entity.ctx) fcn =
+      match ctx with
+      | Label label ->
+        let%lwt pool = fetch ?retries label in
+        Caqti_lwt_unix.Pool.use fcn pool
+        |> raise_caqti_error_labelled label
+      | Connection { conn; label } | TransactionalConnection { conn; label } ->
+        (* TODO(reynir): don't close all database connections if this fails;
+           only the current connection *)
+        fcn conn
+        |> raise_caqti_error_labelled label
+
+    let raise_caqti_error (type maybe_transaction) (ctx : maybe_transaction Entity.ctx) input =
+      let label = match ctx with
+        | Label label | Connection { label; _ } | TransactionalConnection { label; _ } -> label
+      in
+      raise_caqti_error_labelled label input
   end
 
   let query database_label f =
-    Caqti_lwt_unix.Pool.use (fun connection -> f connection)
-    |> Pool.map_fetched database_label
+    Pool.map_fetched database_label f
   ;;
 
   let collect label request input =
@@ -302,55 +313,79 @@ module Make (Config : Pools_sig.ConfigSig) = struct
       |> Lwt.map Caqti_error.uncongested)
   ;;
 
-  let exec_each connection =
-    Lwt_list.map_s (fun request -> request connection)
-    %> Lwt.map CCResult.flatten_l
-    %> Lwt_result.map Utils.flat_unit
-  ;;
+  (* from pool/app/filter/repo/repo.ml *)
+  let in_transaction_sql =
+    let open Caqti_request.Infix in
+    {sql|select @@in_transaction|sql}
+    |> Caqti_type.unit ->! Caqti_type.bool
 
-  let rollback label connection error =
-    let (module Connection : Caqti_lwt.CONNECTION) = connection in
-    let%lwt () =
-      Connection.rollback ()
-      >|+ CCFun.tap (fun () ->
-        Logs.debug (fun m -> m "Successfully rolled back transaction"))
-      |> Pool.raise_caqti_error label
+  let exec_each fns connection =
+    let open Utils.Lwt_result.Infix in
+    List.fold_left
+      (fun acc fn ->
+         acc >>= fun () -> fn connection)
+      (Lwt_result.return ())
+      fns
+
+  let transaction db_ctx ?(setup=[]) ?(cleanup=[]) fn =
+    query db_ctx @@ fun ((module Connection : Caqti_lwt.CONNECTION) as connection) ->
+    let open Utils.Lwt_result.Infix in
+    let fn' () =
+      exec_each setup connection >>= fun () ->
+      fn connection >>= fun result ->
+      exec_each cleanup connection >>= fun () ->
+      Lwt_result.return result
     in
-    Lwt.fail error
-  ;;
+    Connection.find in_transaction_sql () >>= fun in_transaction ->
+    if in_transaction then
+      fn' ()
+    else
+      Connection.with_transaction fn'
 
-  let transaction
-        ?(setup : (Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list = [])
-        ?(cleanup : (Caqti_lwt.connection -> (unit, Caqti_error.t) Lwt_result.t) list =
-          [])
-        label
-        (f : Caqti_lwt.connection -> ('a, Caqti_error.t) Lwt_result.t)
-    : 'a Lwt.t
-    =
-    Caqti_lwt_unix.Pool.use (fun connection ->
-      let (module Connection : Caqti_lwt.CONNECTION) = connection in
-      let* () = Connection.start () in
-      Lwt.catch
-        (fun () ->
-           let* () = exec_each connection setup in
-           let* result = f connection in
-           let* () = exec_each connection cleanup in
-           match%lwt Connection.commit () with
-           | Ok () -> Lwt.return_ok result
-           | Error error -> Lwt.return_error error)
-        (rollback label connection))
-    |> Pool.map_fetched label
-  ;;
+  let transaction_iter db_ctx ?setup ?cleanup fs =
+    transaction db_ctx ?setup ?cleanup (exec_each fs)
 
-  let transaction_iter label queries =
-    Caqti_lwt_unix.Pool.use (fun connection ->
-      let (module Connection : Caqti_lwt.CONNECTION) = connection in
-      let* () = Connection.start () in
-      Lwt.catch
-        (fun () ->
-           let* () = exec_each connection queries in
-           Connection.commit ())
-        (rollback label connection))
-    |> Pool.map_fetched label
-  ;;
+  let label_ctx label = Entity.Label label
+
+  let connection_ctx label fcn =
+    let%lwt pool = Pool.fetch label in
+    Caqti_lwt_unix.Pool.use
+      (fun conn ->
+         let ctx = Entity.Connection { conn; label } in
+         fcn ctx
+         |> Lwt_result.ok)
+      pool
+    |> Lwt.map Result.get_ok
+  (* XXX(reynir): This is safe because we always return [Ok _] or raise an
+     exception . The type of [Caqti_lwt_unix.Pool.use] forces us to return a [_
+     result Lwt.t], but the type also tells us that it doesn't return errors
+     other than what [fcn] returns. *)
+
+  let transaction_ctx label fcn =
+    let%lwt pool = Pool.fetch label in
+    Caqti_lwt_unix.Pool.use
+      (fun conn ->
+         let open Lwt_result.Syntax in
+         let (module Connection : Caqti_lwt.CONNECTION) = conn in
+         let ctx = Entity.TransactionalConnection { conn; label } in
+         Pool.raise_caqti_error ctx @@
+         let* () = Connection.start () in
+         Lwt.catch (fun () ->
+             let%lwt result = fcn ctx in
+             let* () = Connection.commit () in
+             Lwt.return_ok result)
+           (fun exn ->
+              let%lwt () =
+                Pool.raise_caqti_error ctx @@
+                let+ () = Connection.rollback () in
+                Logs.debug (fun m -> m "Successfully rolled back transaction")
+              in
+              Lwt.reraise exn)
+         |> Lwt_result.ok)
+      pool
+    |> Lwt.map Result.get_ok
+    (* XXX(reynir): This is safe because we always return [Ok _] or raise an
+       exception . The type of [Caqti_lwt_unix.Pool.use] forces us to return a [_
+       result Lwt.t], but the type also tells us that it doesn't return errors
+       other than what [fcn] returns. *)
 end

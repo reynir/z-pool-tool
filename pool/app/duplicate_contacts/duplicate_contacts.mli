@@ -26,19 +26,19 @@ type merge =
   ; custom_fields : Custom_field.Public.t list
   }
 
-val find : Database.Label.t -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-val all : ?query:Query.t -> Database.Label.t -> (t list * Query.t) Lwt.t
+val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val all : ?query:Query.t -> Database.ctx -> (t list * Query.t) Lwt.t
 
 val find_by_contact
   :  ?query:Query.t
-  -> Database.Label.t
+  -> Database.ctx
   -> Contact.t
   -> (t list * Query.t) Lwt.t
 
-val count : Database.Label.t -> int Lwt.t
+val count : Database.ctx -> int Lwt.t
 
 val merge
-  :  Database.Label.t
+  :  Database.ctx
   -> ?user_uuid:Pool_common.Id.t
   -> merge
   -> (unit, Pool_message.Error.t) Lwt_result.t
@@ -51,7 +51,7 @@ type event = Ignored of t
 
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
-val handle_event : Database.Label.t -> event -> unit Lwt.t
+val handle_event : Database.ctx -> event -> unit Lwt.t
 val column_ignore : Query.Column.t
 val column_score : Query.Column.t
 
@@ -71,7 +71,7 @@ val filterable_by : Query.Filter.Condition.Human.t list option
 val default_query : Query.t
 
 module Service : sig
-  val run : Database.Label.t -> Pool_common.Id.t -> unit Lwt.t
+  val run : Database.ctx -> Pool_common.Id.t -> unit Lwt.t
   val register : unit -> Sihl.Container.Service.t
 end
 

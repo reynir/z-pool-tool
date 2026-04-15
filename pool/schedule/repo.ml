@@ -112,7 +112,7 @@ module Sql = struct
     select_public_fragment order_by |> Caqti_type.unit ->* public
   ;;
 
-  let find_all pool = Database.collect pool find_all_request
+  let find_all db_ctx = Database.collect db_ctx find_all_request ()
 
   let upsert_request =
     let open Caqti_request.Infix in
@@ -141,7 +141,7 @@ module Sql = struct
     |> t ->. Caqti_type.unit
   ;;
 
-  let upsert pool = Database.exec pool upsert_request
+  let upsert t db_ctx = Database.exec db_ctx upsert_request t
 
   let change_all_status_request =
     let open Caqti_request.Infix in
@@ -155,19 +155,22 @@ module Sql = struct
     |> Caqti_type.(t2 Status.t Status.t ->. unit)
   ;;
 
-  let stop_all_active pool =
-    Database.exec pool change_all_status_request Entity.Status.(Active, Stopped)
+  let stop_all_active db_ctx =
+    Database.exec db_ctx change_all_status_request Entity.Status.(Active, Stopped)
   ;;
 
-  let find_by_db_label pool database_label query =
+  let find_by_db_label db_ctx database_label query =
     let where = "database_label = ? OR database_label IS NULL" in
     let dyn = Dynparam.(empty |> add Database.Repo.Label.t database_label) in
     let select = select_public_fragment in
-    Query.collect_and_count pool (Some query) ~where ~dyn ~select public
+    Query.collect_and_count db_ctx (Some query) ~where ~dyn ~select public
   ;;
 end
 
-let find_all = Sql.find_all Database.Pool.Root.label
-let find_by_db_label = Sql.find_by_db_label Database.Pool.Root.label
-let upsert = Sql.upsert Database.Pool.Root.label
-let stop_all_active () = Sql.stop_all_active Database.Pool.Root.label
+let find_all () = Database.(connection_ctx Pool.Root.label) Sql.find_all
+let find_by_db_label label query =
+  Database.(connection_ctx Pool.Root.label)
+    (fun db_ctx -> Sql.find_by_db_label db_ctx label query)
+let upsert t = Database.(connection_ctx Pool.Root.label) (Sql.upsert t)
+let stop_all_active () =
+  Database.(connection_ctx Pool.Root.label) Sql.stop_all_active

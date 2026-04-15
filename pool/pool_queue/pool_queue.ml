@@ -67,11 +67,11 @@ let dispatch
       ?message_template
       ?job_ctx
       ?run_at
-      label
+      db_ctx
       input
       job
   =
-  let tags = Database.Logger.Tags.create label in
+  let tags = Database.Logger.Tags.create db_ctx in
   let config = Sihl.Configuration.read schema in
   let clone_of =
     CCOption.map_or
@@ -82,20 +82,20 @@ let dispatch
       job_ctx
   in
   let instance =
-    Job.to_instance ~id ?message_template ?run_at ?clone_of label input job
+    Job.to_instance ~id ?message_template ?run_at ?clone_of (Database.label_of_ctx db_ctx) input job
   in
   if Sihl.Configuration.is_production () || config.force_async
   then (
     Logs.debug (fun m -> m ~tags "Dispatching job %a" JobName.pp (Job.name job));
-    let%lwt () = Repo.enqueue label instance in
+    let%lwt () = Repo.enqueue db_ctx instance in
     let%lwt () =
       CCOption.map_or
         ~default:Lwt.return_unit
         (function
-          | Clone (_ : Id.t) -> Repo_mapping.duplicate_for_new_job label instance
+          | Clone (_ : Id.t) -> Repo_mapping.duplicate_for_new_job db_ctx instance
           | Create history_items ->
             Lwt_list.iter_s
-              (Entity_mapping.create instance %> Repo_mapping.insert label)
+              (Entity_mapping.create instance %> Repo_mapping.insert db_ctx)
               history_items)
         job_ctx
     in
@@ -103,8 +103,8 @@ let dispatch
   else dev_dispatch ~callback ~tags job instance
 ;;
 
-let dispatch_all ?(callback = fun (_ : 'a) -> Lwt.return_unit) ?run_at label inputs job =
-  let tags = Database.Logger.Tags.create label in
+let dispatch_all ?(callback = fun (_ : 'a) -> Lwt.return_unit) ?run_at db_ctx inputs job =
+  let tags = Database.Logger.Tags.create db_ctx in
   let config = Sihl.Configuration.read schema in
   let instances, create, clone =
     CCList.fold_left
@@ -116,7 +116,7 @@ let dispatch_all ?(callback = fun (_ : 'a) -> Lwt.return_unit) ?run_at label inp
            | Clone id -> Some id
          in
          let instance =
-           Job.to_instance ~id ?message_template ?run_at ?clone_of label input job
+           Job.to_instance ~id ?message_template ?run_at ?clone_of (Database.label_of_ctx db_ctx) input job
          in
          match job_ctx with
          | Create uuids ->
@@ -132,9 +132,9 @@ let dispatch_all ?(callback = fun (_ : 'a) -> Lwt.return_unit) ?run_at label inp
   in
   if Sihl.Configuration.is_production () || config.force_async
   then (
-    let%lwt () = Repo.enqueue_all label instances in
-    let%lwt () = Repo_mapping.insert_all label create in
-    let%lwt () = Lwt_list.iter_s (Repo_mapping.duplicate_for_new_job label) clone in
+    let%lwt () = Repo.enqueue_all db_ctx instances in
+    let%lwt () = Repo_mapping.insert_all db_ctx create in
+    let%lwt () = Lwt_list.iter_s (Repo_mapping.duplicate_for_new_job db_ctx) clone in
     Lwt_list.iter_s callback instances)
   else Lwt_list.iter_s (dev_dispatch ~callback ~tags job) instances
 ;;
@@ -146,7 +146,7 @@ let run_job
   =
   let tags =
     let open Database.Logger.Tags in
-    CCOption.map_or ~default:(create database_label) (add database_label) tags
+    CCOption.map_or ~default:(create_by_label database_label) (add_by_label database_label) tags
   in
   let log_reraise message exn =
     Logs.err (fun m -> m ~tags "%s:\n'%s'" message (Printexc.to_string exn));
@@ -175,17 +175,18 @@ let run_job
 
 let work_job job instance =
   let database_label = Instance.database_label instance in
-  let tags = Database.Logger.Tags.create database_label in
+  let db_ctx = Database.label_ctx database_label in
+  let tags = Database.Logger.Tags.create db_ctx in
   if Instance.should_run ~is_polled:true instance
   then (
-    let fail = fail database_label (AnyJob.retry_delay job) instance in
+    let fail = fail db_ctx (AnyJob.retry_delay job) instance in
     let%lwt instance =
       Lwt.catch
         (fun () ->
-           let%lwt instance = handle database_label instance in
+           let%lwt instance = handle db_ctx instance in
            match%lwt run_job ~tags job instance with
            | Error msg -> fail msg
-           | Ok () -> success database_label instance)
+           | Ok () -> success db_ctx instance)
         (Printexc.to_string %> Pool_message.Error.nothandled %> fail)
     in
     let%lwt () = archive instance in
@@ -197,10 +198,11 @@ let work_job job instance =
 ;;
 
 let work_queue (job : AnyJob.t) (database_label : Database.Label.t) =
-  let tags = Database.Logger.Tags.create database_label in
+  let tags = Database.Logger.Tags.create_by_label database_label in
+  let db_ctx = Database.label_ctx database_label in
   let msg_prefix = [%string "Queue %{JobName.show job.AnyJob.name}"] in
   let config = Sihl.Configuration.read schema in
-  match%lwt Repo.count_workable job.AnyJob.name database_label with
+  match%lwt Repo.count_workable job.AnyJob.name db_ctx with
   | Error msg ->
     let msg = Pool_message.Error.show msg in
     Logs.debug (fun m -> m ~tags "%s failed: %s" msg_prefix msg);
@@ -211,7 +213,7 @@ let work_queue (job : AnyJob.t) (database_label : Database.Label.t) =
   | Ok count ->
     Logs.debug (fun m -> m ~tags "%s count: %d" msg_prefix count);
     let%lwt instances =
-      Repo.poll_n_workable database_label config.batch_size job.AnyJob.name
+      Repo.poll_n_workable db_ctx config.batch_size job.AnyJob.name
     in
     let () = Lwt.async (fun () -> Lwt_list.iter_s (work_job job) instances) in
     Lwt.return_unit
@@ -219,7 +221,7 @@ let work_queue (job : AnyJob.t) (database_label : Database.Label.t) =
 
 let create_schedule (database_label, (job : AnyJob.t)) : Schedule.t =
   let open Schedule in
-  let tags = Database.Logger.Tags.create database_label in
+  let tags = Database.Logger.Tags.create_by_label database_label in
   let interval = Every (Ptime.Span.of_int_s 1 |> ScheduledTimeSpan.of_span) in
   let periodic_fcn () =
     Logs.debug (fun m ->
@@ -239,14 +241,14 @@ let create_schedule (database_label, (job : AnyJob.t)) : Schedule.t =
 ;;
 
 let start () =
-  let tags = Database.Logger.Tags.create Database.Pool.Root.label in
+  let tags = Database.Logger.Tags.create_by_label Database.Pool.Root.label in
   let archive_and_reset database_label =
     let%lwt () = Repo.cancel_undeliverable_email_jobs database_label in
     let%lwt () = Repo.archive_all_processed database_label in
     Repo.reset_pending_jobs database_label
   in
   let handle fcn database_label =
-    try%lwt fcn database_label with
+    try%lwt fcn (Database.label_ctx database_label) with
     | Caqti_error.(Exn #load_or_connect) ->
       Logs.warn (fun m ->
         m
@@ -283,7 +285,7 @@ let start () =
     in
     jobs_per_database
     |> Lwt_list.iter_s (fun ((database_label, _) as job) ->
-      let tags = Database.Logger.Tags.create database_label in
+      let tags = Database.Logger.Tags.create_by_label database_label in
       create_schedule job |> Schedule.add_and_start ~tags)
 ;;
 

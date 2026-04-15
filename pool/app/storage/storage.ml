@@ -6,18 +6,18 @@ module Logs = (val Logs.src_log log_src : Logs.LOG)
 
 let find_opt = Repo.get_file
 
-let find label id =
-  let%lwt file = Repo.get_file label id in
+let find db_ctx id =
+  let%lwt file = Repo.get_file db_ctx id in
   match file with
   | None -> raise (Sihl.Contract.Storage.Exception ("File not found with id " ^ id))
   | Some file -> Lwt.return file
 ;;
 
-let delete label id =
-  let%lwt file = find label id in
+let delete db_ctx id =
+  let%lwt file = find db_ctx id in
   let blob_id = file.Sihl.Contract.Storage.blob in
-  let%lwt () = Repo.delete_file label file.file.id in
-  Repo.delete_blob label blob_id
+  let%lwt () = Repo.delete_file db_ctx file.file.id in
+  Repo.delete_blob db_ctx blob_id
 ;;
 
 let upload_base64 label ?id file base64 =

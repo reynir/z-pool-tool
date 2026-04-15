@@ -117,10 +117,10 @@ module T (R : RecordSig) = struct
     make_write ~id ~entity_uuid ?user_uuid before after
   ;;
 
-  let insert pool ?user_uuid ~entity_uuid ~before ~after () =
+  let insert db_ctx ?user_uuid ~entity_uuid ~before ~after () =
     create ~entity_uuid ?user_uuid ~before ~after ()
     |> function
-    | Some changelog -> Repo.insert pool changelog
+    | Some changelog -> Repo.insert db_ctx changelog
     | None -> Lwt.return_unit
   ;;
 end

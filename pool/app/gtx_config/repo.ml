@@ -57,8 +57,8 @@ module Cache = struct
   open Hashtbl
 
   let tbl : (Database.Label.t, Entity.t) t = create 5
-  let find = find_opt tbl
-  let add = replace tbl
+  let find db_ctx = find_opt tbl (Database.label_of_ctx db_ctx)
+  let add db_ctx = replace tbl (Database.label_of_ctx db_ctx)
   let clear () = clear tbl
 end
 
@@ -114,25 +114,25 @@ let destroy_request =
   |> Caqti_type.(unit ->. unit)
 ;;
 
-let find_opt pool =
+let find_opt db_ctx =
   let open Utils.Lwt_result.Infix in
-  Cache.find pool
+  Cache.find db_ctx
   |> function
   | Some config -> Lwt.return_some config
   | None ->
-    Database.find_opt pool find_opt_request ()
+    Database.find_opt db_ctx find_opt_request ()
     ||> CCOption.map (fun config ->
-      Cache.add pool config;
+      Cache.add db_ctx config;
       config)
 ;;
 
-let find_exn pool =
+let find_exn db_ctx =
   let open Utils.Lwt_result.Infix in
-  find_opt pool
+  find_opt db_ctx
   ||> CCOption.to_result Pool_message.(Error.NotFound Field.GtxApiKey)
   ||> Pool_common.Utils.get_or_failwith
 ;;
 
-let insert pool = Database.exec pool insert_request
-let update pool = Database.exec pool update_request
-let destroy pool = Database.exec pool destroy_request
+let insert db_ctx = Database.exec db_ctx insert_request
+let update db_ctx = Database.exec db_ctx update_request
+let destroy db_ctx = Database.exec db_ctx destroy_request

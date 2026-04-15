@@ -79,7 +79,7 @@ let get_file_request =
   |> Caqti_type.string ->? stored_file
 ;;
 
-let get_file label id = Database.find_opt label get_file_request id
+let get_file db_ctx id = Database.find_opt db_ctx get_file_request id
 
 let delete_file_request =
   let open Caqti_request.Infix in
@@ -90,7 +90,7 @@ let delete_file_request =
   |> Caqti_type.(string ->. unit)
 ;;
 
-let delete_file label id = Database.exec label delete_file_request id
+let delete_file db_ctx id = Database.exec db_ctx delete_file_request id
 
 let get_blob_request =
   let open Caqti_request.Infix in
@@ -103,7 +103,7 @@ let get_blob_request =
   |> Caqti_type.(string ->? string)
 ;;
 
-let get_blob label id = Database.find_opt label get_blob_request id
+let get_blob db_ctx id = Database.find_opt db_ctx get_blob_request id
 
 let insert_blob_request =
   let open Caqti_request.Infix in
@@ -119,7 +119,7 @@ let insert_blob_request =
   |> Caqti_type.(t2 string string ->. unit)
 ;;
 
-let insert_blob label ~id blob = Database.exec label insert_blob_request (id, blob)
+let insert_blob db_ctx ~id blob = Database.exec db_ctx insert_blob_request (id, blob)
 
 let update_blob_request =
   let open Caqti_request.Infix in
@@ -132,7 +132,7 @@ let update_blob_request =
   |> Caqti_type.(t2 string string ->. unit)
 ;;
 
-let update_blob label ~id blob = Database.exec label update_blob_request (id, blob)
+let update_blob db_ctx ~id blob = Database.exec db_ctx update_blob_request (id, blob)
 
 let delete_blob_request =
   let open Caqti_request.Infix in
@@ -144,21 +144,21 @@ let delete_blob_request =
   |> Caqti_type.(string ->. unit)
 ;;
 
-let delete_blob label id = Database.exec label delete_blob_request id
+let delete_blob db_ctx id = Database.exec db_ctx delete_blob_request id
 
 let clean_handles_request =
   let open Caqti_request.Infix in
   "TRUNCATE storage_handles" |> Caqti_type.(unit ->. unit)
 ;;
 
-let clean_handles label () = Database.exec label clean_handles_request ()
+let clean_handles db_ctx () = Database.exec db_ctx clean_handles_request ()
 
 let clean_blobs_request =
   let open Caqti_request.Infix in
   "TRUNCATE storage_blobs" |> Caqti_type.(unit ->. unit)
 ;;
 
-let clean_blobs label () = Database.exec label clean_blobs_request ()
+let clean_blobs db_ctx () = Database.exec db_ctx clean_blobs_request ()
 
 let fix_collation =
   Database.Migration.Step.create
@@ -214,14 +214,15 @@ let migration () =
 let register_migration () = Database.Migration.register_migration (migration ())
 
 let register_cleaner () =
-  let cleaner label () =
-    let%lwt () = clean_handles label () in
-    clean_blobs label ()
+  let cleaner db_ctx () =
+    let%lwt () = clean_handles db_ctx () in
+    clean_blobs db_ctx ()
   in
   Sihl.Cleaner.register_cleaner (fun ?ctx () ->
     cleaner
       CCOption.(
-        map Database.of_ctx_exn ctx
+        map Database.Label.of_ctx_exn ctx
+        |> map Database.label_ctx
         |> get_exn_or Pool_message.(Error.(NotFound Field.Context |> show)))
       ())
 ;;

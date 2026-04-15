@@ -523,14 +523,15 @@ module Sql = struct
   ;;
 
   let find_sessions_to_remind { Pool_tenant.database_label; _ } =
-    let%lwt text_messages_enabled = Gtx_config.text_messages_enabled database_label in
+    let db_ctx = Database.label_ctx database_label in
+    let%lwt text_messages_enabled = Gtx_config.text_messages_enabled db_ctx in
     let email_default_lead_time =
       Settings.default_email_session_reminder_lead_time_key_yojson
     in
     let text_message_default_lead_time =
       Settings.default_text_message_session_reminder_lead_time_key_yojson
     in
-    let collect = Database.collect database_label in
+    let collect = Database.collect db_ctx in
     let%lwt email_reminders =
       collect
         (find_sessions_to_remind_request `Email)

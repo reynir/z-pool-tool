@@ -75,8 +75,8 @@ let update_request table =
   |> Repo_entity.Instance.t ->. Caqti_type.unit
 ;;
 
-let update ?(history = false) label =
-  Database.exec label (tablename history |> update_request)
+let update ?(history = false) db_ctx =
+  Database.exec db_ctx (tablename history |> update_request)
 ;;
 
 let find_request table =
@@ -89,8 +89,8 @@ let find_request table =
   |> Repo_entity.Id.t ->? Repo_entity.Instance.t
 ;;
 
-let find label id =
-  let find_in table = Database.find_opt label (find_request table) id in
+let find db_ctx id =
+  let find_in table = Database.find_opt db_ctx (find_request table) id in
   find_in `History
   >|> (function
    | Some element -> Lwt.return_some element
@@ -142,7 +142,7 @@ let find_workable_request =
   find_workable_query () |> Repo_entity.(JobName.t ->* Instance.t)
 ;;
 
-let find_workable job label = Database.collect label find_workable_request job
+let find_workable job db_ctx = Database.collect db_ctx find_workable_request job
 
 let count_all_workable_request =
   [%string
@@ -153,9 +153,9 @@ let count_all_workable_request =
   |> Caqti_type.(unit ->! int)
 ;;
 
-let count_all_workable label =
+let count_all_workable db_ctx =
   Lwt.catch
-    (fun () -> Database.find_opt label count_all_workable_request ())
+    (fun () -> Database.find_opt db_ctx count_all_workable_request ())
     (function
       | Caqti_error.(Exn #load_or_connect) -> Lwt.return_none
       | exn -> Lwt.reraise exn)
@@ -167,16 +167,16 @@ let count_workable_request =
   find_workable_query ~count:true () |> Repo_entity.JobName.t ->? Caqti_type.int
 ;;
 
-let count_workable job_name label =
-  Database.find_opt label count_workable_request job_name
+let count_workable job_name db_ctx =
+  Database.find_opt db_ctx count_workable_request job_name
   ||> CCOption.to_result Pool_message.Error.NoValue
 ;;
 
-let poll_n_workable database_label n_instances job_name =
+let poll_n_workable db_ctx n_instances job_name =
   let find_workable_request =
     find_workable_query ~limit:n_instances () |> Repo_entity.(JobName.t ->* Instance.t)
   in
-  Database.query database_label (fun connection ->
+  Database.query db_ctx (fun connection ->
     let (module Connection : Caqti_lwt.CONNECTION) = connection in
     let* () = Connection.start () in
     Lwt.catch
@@ -240,7 +240,7 @@ let insert_request table =
 ;;
 
 let enqueue_request = insert_request `Current
-let enqueue label = Database.exec label enqueue_request
+let enqueue db_ctx = Database.exec db_ctx enqueue_request
 
 let populatable =
   let open Entity in
@@ -249,12 +249,12 @@ let populatable =
     { job with Instance.id = to_bytes id; clone_of = CCOption.map to_bytes clone_of })
 ;;
 
-let enqueue_all label = function
+let enqueue_all db_ctx = function
   | [] -> Lwt.return_unit
   | instances ->
     let table = sql_table `Current in
     let columns = sql_select_columns ~decode:false (Some table) in
-    Database.query label (fun connection ->
+    Database.query db_ctx (fun connection ->
       let module Connection = (val connection : Caqti_lwt.CONNECTION) in
       Connection.populate
         ~table
@@ -277,7 +277,7 @@ let reset_pending_request =
   |> Caqti_type.(unit ->. unit)
 ;;
 
-let reset_pending_jobs label = Database.exec label reset_pending_request ()
+let reset_pending_jobs db_ctx = Database.exec db_ctx reset_pending_request ()
 
 let delete_request =
   [%string
@@ -301,7 +301,7 @@ let archive_insert_request =
 
 let archive { Entity.Instance.id; database_label; _ } =
   let open Lwt_result.Syntax in
-  Database.query database_label (fun connection ->
+  Database.query (Database.label_ctx database_label) (fun connection ->
     let (module Connection : Caqti_lwt.CONNECTION) = connection in
     let* () = Connection.start () in
     Lwt.catch
@@ -326,8 +326,8 @@ let cancel_undeliverable_email_jobs_request =
   |> Caqti_type.(unit ->. unit)
 ;;
 
-let cancel_undeliverable_email_jobs label =
-  Database.exec label cancel_undeliverable_email_jobs_request ()
+let cancel_undeliverable_email_jobs db_ctx =
+  Database.exec db_ctx cancel_undeliverable_email_jobs_request ()
 ;;
 
 let find_archivable_request =
@@ -340,8 +340,8 @@ let find_archivable_request =
   |> Caqti_type.unit ->* Repo_entity.Id.t
 ;;
 
-let archive_all_processed database_label =
-  Database.query database_label (fun connection ->
+let archive_all_processed db_ctx =
+  Database.query db_ctx (fun connection ->
     let (module Connection : Caqti_lwt.CONNECTION) = connection in
     let* ids = Connection.collect_list find_archivable_request () in
     let* () = Connection.start () in

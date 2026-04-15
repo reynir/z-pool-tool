@@ -313,16 +313,15 @@ let promote_contact_delete_contact_request =
   |> Pool_user.Repo.Id.t ->. Caqti_type.unit
 ;;
 
-let promote_contact pool id =
-  [ promote_contact_insert_contact_to_promoted_request, id
-  ; promote_contact_insert_admin_request, id
-  ; promote_contact_set_admin_request, id
-  ; promote_contact_delete_contact_request, id
+(* XXX(reynir): should be executed in transactional context *)
+let promote_contact db_ctx id =
+  [ promote_contact_insert_contact_to_promoted_request
+  ; promote_contact_insert_admin_request
+  ; promote_contact_set_admin_request
+  ; promote_contact_delete_contact_request
   ]
-  |> CCList.map (fun (request, input) connection ->
-    let (module Connection : Caqti_lwt.CONNECTION) = connection in
-    Connection.exec request input)
-  |> Database.transaction_iter pool
+  |> Lwt_list.iter_s
+    (fun sql -> Database.exec db_ctx sql id)
 ;;
 
 let search_by_name_and_email_request ?conditions =

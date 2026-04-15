@@ -12,7 +12,7 @@ let start_handler identifier () =
   let open Schedule in
   let interval = Ptime.Span.of_int_s 10 in
   let periodic_fcn () =
-    Logs.debug ~src (fun m -> m ~tags:Database.(Logger.Tags.create Pool.Root.label) "Run");
+    Logs.debug ~src (fun m -> m ~tags:Database.(Logger.Tags.create_by_label Pool.Root.label) "Run");
     run identifier ()
   in
   create "system_events" (Every (interval |> ScheduledTimeSpan.of_span)) None periodic_fcn

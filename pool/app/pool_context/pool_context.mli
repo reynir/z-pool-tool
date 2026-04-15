@@ -59,8 +59,11 @@ val find : Rock.Request.t -> (t, Pool_message.Error.t) result
 val find_exn : Rock.Request.t -> t
 val set : Rock.Request.t -> t -> Rock.Request.t
 val find_contact : t -> (Contact.t, Pool_message.Error.t) result
-val context_user_of_user : Database.Label.t -> Pool_user.t -> user Lwt.t
+val context_user_of_user : Database.ctx -> Pool_user.t -> user Lwt.t
 val dashboard_path : ?guest:string -> user -> string
+val database_ctx : t -> (Database.ctx -> 'a Lwt.t) -> 'a Lwt.t
+val transaction_database_ctx : t -> (Database.ctx -> 'a Lwt.t) -> 'a Lwt.t
+val label_database_ctx : t -> Database.ctx
 
 val create
   :  (Pool_message.Field.t * string) list
@@ -119,13 +122,13 @@ val set_flash_fetcher : t -> (string -> string option) -> t
 module Utils : sig
   val find_authorizable_opt
     :  ?admin_only:bool
-    -> Database.Label.t
+    -> Database.ctx
     -> user
     -> Guard.Actor.t option Lwt.t
 
   val find_authorizable
     :  ?admin_only:bool
-    -> Database.Label.t
+    -> Database.ctx
     -> user
     -> (Guard.Actor.t, Pool_message.Error.t) Lwt_result.t
 

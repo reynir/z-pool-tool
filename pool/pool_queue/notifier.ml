@@ -15,7 +15,7 @@ let job_reporter
   let open Entity.Status in
   match status, last_error with
   | (Failed | Pending), Some last_error when tries >= max_tries ->
-    let tags = Database.Logger.Tags.create database_label in
+    let tags = Database.Logger.Tags.create_by_label database_label in
     let%lwt link =
       let default = "Couldn't generate Link" in
       let path = [%string "/admin/settings/queue/%{Entity.Id.value id}"] in

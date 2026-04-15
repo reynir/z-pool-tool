@@ -39,7 +39,7 @@ module Sql = struct
     |> RepoEntity.Write.t ->. Caqti_type.unit
   ;;
 
-  let update pool = Database.exec pool update_request
+  let update db_ctx = Database.exec db_ctx update_request
 
   let sql_select_storage_handle_columns ~alias =
     let uuid = Id.sql_select_fragment ~field:[%string "%{alias}.uuid"] in
@@ -118,9 +118,9 @@ module Sql = struct
     select_from_tenants_sql find_fragment `Read |> Pool_common.Repo.Id.t ->! RepoEntity.t
   ;;
 
-  let find pool id =
+  let find db_ctx id =
     let open Utils.Lwt_result.Infix in
-    Database.find_opt pool find_request id
+    Database.find_opt db_ctx find_request id
     ||> CCOption.to_result Pool_message.(Error.NotFound Field.Tenant)
   ;;
 
@@ -274,25 +274,25 @@ let find_all pool () =
 
 let insert pool (tenant, database) =
   let open Database in
-  transaction_iter
-    pool
-    [ exec_query Repo.insert_request database; exec_query Sql.insert_request tenant ]
+  transaction_ctx pool @@ fun db_ctx ->
+  let%lwt () = exec db_ctx Repo.insert_request database in
+  exec db_ctx Sql.insert_request tenant
 ;;
 
-let update = Sql.update
+let update pool ent =
+  Database.(connection_ctx pool) @@ fun db_ctx ->
+  Sql.update db_ctx ent
 
 let update_database pool (tenant, database) =
   let open Database in
-  transaction_iter
-    pool
-    [ exec_query
-        Database.Repo.update_request
-        (tenant.Entity.Write.database_label, database)
-    ; exec_query
-        Sql.update_request
-        { tenant with
-          Entity.Write.database_label = Database.label database
-        ; updated_at = Pool_common.UpdatedAt.create_now ()
-        }
-    ]
+  transaction_ctx pool @@ fun db_ctx ->
+  let%lwt () =
+    exec db_ctx Database.Repo.update_request (tenant.Entity.Write.database_label, database)
+  in
+  exec db_ctx
+    Sql.update_request
+    { tenant with
+      Entity.Write.database_label = Database.label database
+    ; updated_at = Pool_common.UpdatedAt.create_now ()
+    }
 ;;

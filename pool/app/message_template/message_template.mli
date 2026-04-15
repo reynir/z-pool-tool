@@ -357,7 +357,7 @@ module InactiveContactDeactivation : sig
   val email_params : email_layout -> Contact.t -> (string * string) list
 
   val prepare
-    :  Database.Label.t
+    :  Database.ctx
     -> ( Contact.t -> (Email.dispatch, Pool_message.Error.t) result
          , Pool_message.Error.t )
          Lwt_result.t
@@ -457,9 +457,8 @@ module PhoneVerification : sig
   val message_params : Pool_common.VerificationCode.t -> (string * string) list
 
   val create_text_message
-    :  Database.Label.t
+    :  Database.ctx
     -> Pool_common.Language.t
-    -> Pool_tenant.t
     -> Contact.t
     -> Pool_user.CellPhone.t
     -> Pool_common.VerificationCode.t

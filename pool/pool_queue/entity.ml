@@ -204,7 +204,7 @@ module Instance = struct
   ;;
 
   let default_error_handler label msg instance =
-    let tags = Database.Logger.Tags.create label in
+    let tags = Database.Logger.Tags.create_by_label label in
     let job = instance |> add_error msg |> failed in
     Logs.err (fun m -> m ~tags "Job failed: %s" ([%show: t] job));
     Lwt.return_unit

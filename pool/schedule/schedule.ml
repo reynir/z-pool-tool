@@ -3,7 +3,7 @@ include Entity
 module Guard = Entity_guard
 
 let src = Logs.Src.create "schedule.service"
-let tags = Database.(Logger.Tags.create Pool.Root.label)
+let tags = Database.(Logger.Tags.create_by_label Pool.Root.label)
 
 module Registered = struct
   module ScheduleMap = CCMap.Make (Label)
@@ -88,7 +88,7 @@ end
 
 let run ({ database_label; label; scheduled_time; status; _ } as schedule : t) =
   let open Utils.Lwt_result.Infix in
-  let tags = CCOption.map_or ~default:tags Database.Logger.Tags.create database_label in
+  let tags = CCOption.map_or ~default:tags Database.Logger.Tags.create_by_label database_label in
   let delay = run_in scheduled_time in
   let notify status =
     Logs.debug ~src (fun m -> m ~tags "%s: Run is %s" label (Status.show status));
