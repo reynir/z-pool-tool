@@ -65,8 +65,8 @@ module ParticipationTags : sig
     | Session of Pool_common.Id.t
 
   val get_id : entity -> Pool_common.Id.t
-  val find_all : Database.ctx -> entity -> t list Lwt.t
-  val find_available : Database.ctx -> entity -> t list Lwt.t
+  val find_all : _ Database.ctx -> entity -> t list Lwt.t
+  val find_available : _ Database.ctx -> entity -> t list Lwt.t
 end
 
 type event =
@@ -84,30 +84,30 @@ val created : t -> event
 val updated : t * t -> event
 val tagged : Tagged.t -> event
 val untagged : Tagged.t -> event
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
-val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-val find_multiple : Database.ctx -> Id.t list -> (Id.t * Title.t) list Lwt.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> _ Database.ctx -> event -> unit Lwt.t
+val find : _ Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val find_multiple : _ Database.ctx -> Id.t list -> (Id.t * Title.t) list Lwt.t
 
 val search_by_title
-  :  Database.ctx
+  :  _ Database.ctx
   -> ?model:Model.t
   -> ?exclude:Id.t list
   -> string
   -> (Id.t * Title.t) list Lwt.t
 
-val find_by : ?query:Query.t -> Database.ctx -> (t list * Query.t) Lwt.t
-val find_all_with_model : Database.ctx -> Model.t -> t list Lwt.t
-val find_all_of_entity : Database.ctx -> Model.t -> Pool_common.Id.t -> t list Lwt.t
+val find_by : ?query:Query.t -> _ Database.ctx -> (t list * Query.t) Lwt.t
+val find_all_with_model : _ Database.ctx -> Model.t -> t list Lwt.t
+val find_all_of_entity : _ Database.ctx -> Model.t -> Pool_common.Id.t -> t list Lwt.t
 
 val find_all_validated
   :  ?permission:Guard.Permission.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> Guard.Actor.t
   -> t list Lwt.t
 
 val find_all_validated_with_model
   :  ?permission:Guard.Permission.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> Model.t
   -> Guard.Actor.t
   -> t list Lwt.t
@@ -115,21 +115,21 @@ val find_all_validated_with_model
 val create_find_all_tag_sql : string -> string -> string
 
 val already_exists
-  :  Database.ctx
+  :  _ Database.ctx
   -> ?exclude_id:Id.t
   -> Title.t
   -> Model.t
   -> bool Lwt.t
 
-val insert : Database.ctx -> t -> (unit, Pool_message.Error.t) Lwt_result.t
-val update : Database.ctx -> t -> unit Lwt.t
+val insert : _ Database.ctx -> t -> (unit, Pool_message.Error.t) Lwt_result.t
+val update : _ Database.ctx -> t -> unit Lwt.t
 
 val insert_tagged
-  :  Database.ctx
+  :  _ Database.ctx
   -> Tagged.t
   -> (unit, Pool_message.Error.t) Lwt_result.t
 
-val delete_tagged : Database.ctx -> Tagged.t -> unit Lwt.t
+val delete_tagged : _ Database.ctx -> Tagged.t -> unit Lwt.t
 
 module Guard : sig
   module Target : sig

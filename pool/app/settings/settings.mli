@@ -108,8 +108,8 @@ module PageScript : sig
     -> unit
     -> (Pool_message.Error.t, t) Pool_conformist.Field.t
 
-  val find : Database.ctx -> page_scripts Lwt.t
-  val find_id : Database.ctx -> location -> Pool_common.Id.t Lwt.t
+  val find : _ Database.ctx -> page_scripts Lwt.t
+  val find_id : _ Database.ctx -> location -> Pool_common.Id.t Lwt.t
   val clear_cache : unit -> unit
   val read_location : string -> location
   val show_location : location -> string
@@ -168,48 +168,48 @@ type event =
   | UserImportSecondReminderAfterUpdated of UserImportReminder.SecondReminderAfter.t
   | PageScriptUpdated of (PageScript.t option * PageScript.location)
 
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> _ Database.ctx -> event -> unit Lwt.t
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val find_languages : Database.ctx -> Pool_common.Language.t list Lwt.t
-val find_email_suffixes : Database.ctx -> EmailSuffix.t list Lwt.t
-val find_contact_email : Database.ctx -> ContactEmail.t Lwt.t
+val find_languages : _ Database.ctx -> Pool_common.Language.t list Lwt.t
+val find_email_suffixes : _ Database.ctx -> EmailSuffix.t list Lwt.t
+val find_contact_email : _ Database.ctx -> ContactEmail.t Lwt.t
 
 val find_inactive_user_disable_after
-  :  Database.ctx
+  :  _ Database.ctx
   -> InactiveUser.DisableAfter.t Lwt.t
 
-val find_inactive_user_warning : Database.ctx -> InactiveUser.Warning.t Lwt.t
+val find_inactive_user_warning : _ Database.ctx -> InactiveUser.Warning.t Lwt.t
 
 val find_inactive_user_service_disabled
-  :  Database.ctx
+  :  _ Database.ctx
   -> InactiveUser.ServiceDisabled.t Lwt.t
 
 val find_trigger_profile_update_after
-  :  Database.ctx
+  :  _ Database.ctx
   -> TriggerProfileUpdateAfter.t Lwt.t
 
 val default_language_of_list : Pool_common.Language.t list -> Pool_common.Language.t
-val default_language : Database.ctx -> Pool_common.Language.t Lwt.t
+val default_language : _ Database.ctx -> Pool_common.Language.t Lwt.t
 
 val find_default_reminder_lead_time
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_common.Reminder.EmailLeadTime.t Lwt.t
 
 val find_default_text_msg_reminder_lead_time
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_common.Reminder.TextMessageLeadTime.t Lwt.t
 
 val find_user_import_first_reminder_after
-  :  Database.ctx
+  :  _ Database.ctx
   -> UserImportReminder.FirstReminderAfter.t Lwt.t
 
 val find_user_import_second_reminder_after
-  :  Database.ctx
+  :  _ Database.ctx
   -> UserImportReminder.SecondReminderAfter.t Lwt.t
 
-val id_by_key : Database.ctx -> Key.t -> Pool_common.Id.t Lwt.t
+val id_by_key : _ Database.ctx -> Key.t -> Pool_common.Id.t Lwt.t
 val default_email_session_reminder_lead_time_key_yojson : Yojson.Safe.t
 val default_text_message_session_reminder_lead_time_key_yojson : Yojson.Safe.t
 val trigger_profile_update_after_key_yojson : Yojson.Safe.t

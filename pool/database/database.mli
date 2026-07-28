@@ -124,6 +124,8 @@ type _ ctx = private
       connection for all queries. See the constructors {!label_ctx},
       {!connection_ctx} and {!transaction_ctx}. *)
 
+type any_ctx = Any : 'maybe_transaction ctx -> any_ctx
+
 val label_of_ctx : _ ctx -> Label.t
 val to_ctx : _ ctx -> (string * string) list
 
@@ -133,7 +135,7 @@ val label_ctx : Label.t -> no_transaction ctx
 val connection_ctx : Label.t -> (no_transaction ctx -> 'a Lwt.t) -> 'a Lwt.t
 val transaction_ctx : Label.t -> (transaction ctx -> 'a Lwt.t) -> 'a Lwt.t
 
-val resolve_ctx : ?db_ctx:_ ctx -> Label.t -> no_transaction ctx
+val resolve_ctx : ?db_ctx:_ ctx -> Label.t -> any_ctx
 (** [resolve_ctx ?db_ctx database_label] asserts that [~db_ctx] corresponds to
     [database_label] or creates a [Label database_label] ctx if [db_ctx] is
     [None].

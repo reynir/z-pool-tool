@@ -49,7 +49,7 @@ module Service : sig
     -> ?new_recipient:Pool_user.CellPhone.t
     -> ?message_template:string
     -> ?job_ctx:Pool_queue.job_ctx
-    -> Database.ctx
+    -> Database.transaction Database.ctx
     -> t
     -> unit Lwt.t
 end
@@ -105,7 +105,7 @@ type delivery_report =
   }
 
 val find_report_by_queue_id
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_queue.Id.t
   -> delivery_report option Lwt.t
 
@@ -117,7 +117,7 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : Database.ctx -> event -> unit Lwt.t
+val handle_event : Database.transaction Database.ctx -> event -> unit Lwt.t
 
 val create_sent
   :  ?id:Pool_queue.Id.t

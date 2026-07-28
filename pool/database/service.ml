@@ -125,13 +125,13 @@ let clean_all db_ctx =
   exec_clean_req (clean_root_reqs, Entity.Label Entity.root)
 ;;
 
+type any_ctx = Any : 'maybe_transaction Entity.ctx -> any_ctx
+
 let resolve_ctx (type maybe_transaction) ?(db_ctx : maybe_transaction Entity.ctx option) label =
   match db_ctx with
-  | None -> label_ctx label
+  | None -> Any (label_ctx label)
   | Some ((Entity.Label _ | Entity.Connection _) as db_ctx) ->
     assert (String.equal (Entity.label_of_ctx db_ctx) label);
-    db_ctx
-  | Some Entity.TransactionalConnection { conn; label } ->
-    (* XXX: Here we "lie" and downgrade the transactionional connection to a
-       non-transactional connection. This is to make the type work. *)
-    Entity.Connection { conn; label }
+    Any db_ctx
+  | Some (Entity.TransactionalConnection _ as db_ctx) ->
+    Any db_ctx

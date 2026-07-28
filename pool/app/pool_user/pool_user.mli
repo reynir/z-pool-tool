@@ -84,7 +84,7 @@ module Password : sig
     -> unit
     -> (Pool_message.Error.t, t) Pool_conformist.Field.t
 
-  val validate_current : Database.ctx -> Id.t -> Plain.t -> bool Lwt.t
+  val validate_current : _ Database.ctx -> Id.t -> Plain.t -> bool Lwt.t
 
   (** [define database_label user_id password password_confirmation]
       overrides the current password of a [user_id] if [password] and
@@ -94,7 +94,7 @@ module Password : sig
       expose this function to users but only admins. If you want the user to
       update their own password use {!update} instead. *)
   val define
-    :  Database.ctx
+    :  _ Database.ctx
     -> Id.t
     -> Plain.t
     -> Confirmation.t
@@ -105,7 +105,7 @@ module Password : sig
       The [old_password] is the current password that the user has to enter.
       [new_password] has to equal [new_password_confirmation]. *)
   val update
-    :  Database.ctx
+    :  _ Database.ctx
     -> Id.t
     -> old_password:Plain.t
     -> new_password:Plain.t
@@ -113,11 +113,11 @@ module Password : sig
     -> (unit, Pool_message.Error.t) Lwt_result.t
 
   module Reset : sig
-    val create_token : Database.ctx -> EmailAddress.t -> Pool_token.t option Lwt.t
+    val create_token : _ Database.ctx -> EmailAddress.t -> Pool_token.t option Lwt.t
 
     val reset_password
       :  token:Pool_token.t
-      -> Database.ctx
+      -> _ Database.ctx
       -> Plain.t
       -> Confirmation.t
       -> (unit, Pool_message.Error.t) Lwt_result.t
@@ -227,7 +227,7 @@ val fullname : ?reversed:bool -> t -> string
 val status : t -> Status.t
 val is_admin : t -> bool
 val is_confirmed : t -> bool
-val find_active_by_email_opt : Database.ctx -> EmailAddress.t -> t option Lwt.t
+val find_active_by_email_opt : _ Database.ctx -> EmailAddress.t -> t option Lwt.t
 
 module Repo : sig
   module Id : Pool_model.Base.CaqtiSig with type t = Id.t
@@ -303,10 +303,10 @@ module FailedLoginAttempt : sig
   val create : ?id:Id.t -> EmailAddress.t -> Counter.t -> BlockedUntil.t option -> t
 
   module Repo : sig
-    val find_opt : Database.ctx -> EmailAddress.t -> t option Lwt.t
-    val find_current : Database.ctx -> EmailAddress.t -> t option Lwt.t
-    val insert : Database.ctx -> t -> unit Lwt.t
-    val delete : Database.ctx -> t -> unit Lwt.t
+    val find_opt : _ Database.ctx -> EmailAddress.t -> t option Lwt.t
+    val find_current : _ Database.ctx -> EmailAddress.t -> t option Lwt.t
+    val insert : _ Database.ctx -> t -> unit Lwt.t
+    val delete : _ Database.ctx -> t -> unit Lwt.t
   end
 end
 
@@ -319,7 +319,7 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : ?tags:Logs.Tag.set -> Database.ctx -> event -> unit Lwt.t
+val handle_event : ?tags:Logs.Tag.set -> _ Database.ctx -> event -> unit Lwt.t
 
 module Web : sig
   (** [user_from_token ?key database_label read_token request] returns the user that is
@@ -332,8 +332,8 @@ module Web : sig
       a given token. *)
   val user_from_token
     :  ?key:string
-    -> Database.ctx
-    -> (Database.ctx -> string -> k:string -> Id.t option Lwt.t)
+    -> 'a Database.ctx
+    -> ('a Database.ctx -> string -> k:string -> Id.t option Lwt.t)
     -> Rock.Request.t
     -> t option Lwt.t
 
@@ -353,35 +353,35 @@ module Web : sig
     :  ?cookie_key:string
     -> ?secret:string
     -> ?key:string
-    -> Database.ctx
+    -> _ Database.ctx
     -> Rock.Request.t
     -> t option Lwt.t
 end
 
 (** [find database_label id] returns a user with [id], [Error NotFound] otherwise. *)
-val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val find : _ Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
 
 (** [find_exn database_label id] returns a user with [id], throws exception otherwise. *)
-val find_exn : Database.ctx -> Id.t -> t Lwt.t
+val find_exn : _ Database.ctx -> Id.t -> t Lwt.t
 
 (** [find_opt database_label id] returns a user with [id], [None] otherwise. *)
-val find_opt : Database.ctx -> Id.t -> t option Lwt.t
+val find_opt : _ Database.ctx -> Id.t -> t option Lwt.t
 
 (** [find_by_email database_label email] returns a [User.t] if there is a user with
     email address [email]. The lookup is case-insensitive. [Error NotFound] otherwise. *)
 val find_by_email
-  :  Database.ctx
+  :  _ Database.ctx
   -> EmailAddress.t
   -> (t, Pool_message.Error.t) Lwt_result.t
 
 (** [find_by_email database_label email] returns a [User.t] if there is a user with
     email address [email]. The lookup is case-insensitive. Raises an
     [{!Exception}] otherwise. *)
-val find_by_email_exn : Database.ctx -> EmailAddress.t -> t Lwt.t
+val find_by_email_exn : _ Database.ctx -> EmailAddress.t -> t Lwt.t
 
 (** [find_by_email_opt database_label email] returns a [User.t] if there is a user with
     email address [email]. *)
-val find_by_email_opt : Database.ctx -> EmailAddress.t -> t option Lwt.t
+val find_by_email_opt : _ Database.ctx -> EmailAddress.t -> t option Lwt.t
 
 (** [update ?email ?lastname ?firstname ?status database_label user] stores the
     updated [user] and returns it. *)
@@ -391,18 +391,18 @@ val update
   -> ?firstname:Firstname.t
   -> ?status:Status.t
   -> ?confirmed:Confirmed.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> t
   -> t Lwt.t
 
 (** [confirm database_label user] stores the [user] as confirmed and returns it. *)
-val confirm : Database.ctx -> t -> t Lwt.t
+val confirm : _ Database.ctx -> t -> t Lwt.t
 
 (** [create_user ?id label email lastname firstname password password_confirmed] returns
     a non-admin user. *)
 val create_user
   :  ?id:Id.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> EmailAddress.t
   -> Lastname.t
   -> Firstname.t
@@ -414,7 +414,7 @@ val create_user
     an admin user. *)
 val create_admin
   :  ?id:Id.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> EmailAddress.t
   -> Lastname.t
   -> Firstname.t
@@ -425,7 +425,7 @@ val create_admin
 (** [login label email password] returns the user associated with [email] if
     [password] matches the current password. *)
 val login
-  :  Database.ctx
+  :  _ Database.ctx
   -> EmailAddress.t
   -> Password.Plain.t
   -> (t, Pool_message.Error.t) Lwt_result.t

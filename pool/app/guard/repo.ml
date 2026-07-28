@@ -351,13 +351,11 @@ module Cache = struct
      updated/removed (Issue: https://github.com/uzh/guardian/issues/11) *)
   open CCCache
 
-  let equal_find_actor (ctx1, a1) (ctx2, a2) =
-    let l1 = Database.label_of_ctx ctx1 and l2 = Database.label_of_ctx ctx2 in
-    Database.Label.equal l1 l2 && Core.Uuid.Actor.equal a1 a2
+  let equal_find_actor (lbl1, a1) (lbl2, a2) =
+    Database.Label.equal lbl1 lbl2 && Core.Uuid.Actor.equal a1 a2
   ;;
 
-  let equal_validation (ctx1, s1, any1, a1) (ctx2, s2, any2, a2) =
-    let l1 = Database.label_of_ctx ctx1 and l2 = Database.label_of_ctx ctx2 in
+  let equal_validation (l1, s1, any1, a1) (l2, s2, any2, a2) =
     Database.Label.equal l1 l2
     && Core.ValidationSet.equal s1 s2
     && CCBool.equal any1 any2
@@ -392,8 +390,8 @@ module Actor = struct
           m ~tags "Found in cache: Actor %s" (id |> Core.Uuid.Actor.to_string)))
       else Cache.log_cache_size Cache.lru_find_actor "lru_find_actor"
     in
-    let find' (label, id) = find ~ctx:(Database.to_ctx label) id in
-    (db_ctx, id) |> CCCache.(with_cache ~cb Cache.lru_find_actor find')
+    let find' (label, id) = find ~ctx:(Database.Label.to_ctx label) id in
+    (Database.label_of_ctx db_ctx, id) |> CCCache.(with_cache ~cb Cache.lru_find_actor find')
   ;;
 
   let can_assign_roles db_ctx actor =
@@ -483,10 +481,10 @@ module ActorRole = struct
           m ~tags "Found in cache: Actor %s" (actor |> Core.Uuid.Actor.to_string)))
       else Cache.log_cache_size Cache.lru_find_by_actor "lru_find_by_actor"
     in
-    let find_by_actor' (ctx, actor) =
-      Database.collect ctx find_by_actor_request actor
+    let find_by_actor' (label, actor) =
+      Database.collect (Database.label_ctx label) find_by_actor_request actor
     in
-    (db_ctx, actor)
+    (Database.label_of_ctx db_ctx, actor)
     |> CCCache.(with_cache ~cb Cache.lru_find_by_actor find_by_actor')
   ;;
 
@@ -514,13 +512,13 @@ let validate
   in
   let validate' (label, set, any_id, actor) =
     validate
-      ~ctx:(Database.to_ctx label)
+      ~ctx:(Database.Label.to_ctx label)
       ~any_id
       Pool_message.Error.authorization
       set
       actor
   in
-  (db_ctx, validation_set, any_id, actor)
+  (Database.label_of_ctx db_ctx, validation_set, any_id, actor)
   |> CCCache.(with_cache ~cb Cache.lru_validation validate')
 ;;
 

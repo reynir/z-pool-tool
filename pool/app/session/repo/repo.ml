@@ -730,27 +730,35 @@ module Sql = struct
     CCOption.to_list guardian |> CCString.concat " AND " |> Lwt.return
   ;;
 
-  let query_by_admin where ?query actor pool =
-    let%lwt guardian_conditions = find_by_user_params pool actor in
+  let query_by_admin db_ctx where ?query actor =
+    let%lwt guardian_conditions = find_by_user_params db_ctx actor in
     let where = Format.asprintf "%s AND %s" guardian_conditions where in
-    Query.collect_and_count pool query ~select:find_request_sql ~where Repo_entity.t
+    Query.collect_and_count db_ctx query ~select:find_request_sql ~where Repo_entity.t
   ;;
 
   let find_incomplete_by_admin =
-    {sql|
-      pool_sessions.closed_at IS NULL
-      AND pool_sessions.canceled_at IS NULL
-      AND (pool_sessions.start + INTERVAL duration SECOND) < NOW()
-    |sql}
-    |> query_by_admin
+    fun ?query actor db_ctx ->
+    let fn =
+      {sql|
+        pool_sessions.closed_at IS NULL
+        AND pool_sessions.canceled_at IS NULL
+        AND (pool_sessions.start + INTERVAL duration SECOND) < NOW()
+      |sql}
+      |> query_by_admin db_ctx
+    in
+    fn ?query actor
   ;;
 
   let find_upcoming_by_admin =
-    {sql|
-      (pool_sessions.start + INTERVAL duration SECOND) > NOW()
-      AND pool_sessions.closed_at IS NULL
-    |sql}
-    |> query_by_admin
+    fun ?query actor db_ctx ->
+    let fn =
+      {sql|
+        (pool_sessions.start + INTERVAL duration SECOND) > NOW()
+        AND pool_sessions.closed_at IS NULL
+      |sql}
+      |> query_by_admin db_ctx
+    in
+    fn ?query actor
   ;;
 
   let calendar_query ?location_uuid ~start_time ~end_time pool actor guardian =

@@ -447,14 +447,14 @@ val validate_partial_update
   -> (PartialUpdate.t, Pool_message.Error.t) Lwt_result.t
 
 val changelog_to_human
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_common.Language.t
   -> Changelog.t
   -> Changelog.t Lwt.t
 
 val create_custom_field_answer_changelog
   :  ?user_uuid:Id.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> Contact.t
   -> Public.t
   -> unit Lwt.t
@@ -482,83 +482,83 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
-val find_by_model : Database.ctx -> Model.t -> t list Lwt.t
-val find_by_group : Database.ctx -> Group.Id.t -> t list Lwt.t
-val find_ungrouped_by_model : Database.ctx -> Model.t -> t list Lwt.t
-val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
-val find_for_duplicate_check : Database.ctx -> t list Lwt.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> _ Database.ctx -> event -> unit Lwt.t
+val find_by_model : _ Database.ctx -> Model.t -> t list Lwt.t
+val find_by_group : _ Database.ctx -> Group.Id.t -> t list Lwt.t
+val find_ungrouped_by_model : _ Database.ctx -> Model.t -> t list Lwt.t
+val find : _ Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val find_for_duplicate_check : _ Database.ctx -> t list Lwt.t
 
 val find_by_table_view
-  :  Database.ctx
+  :  _ Database.ctx
   -> [< `SessionClose | `SessionDetail ]
   -> t list Lwt.t
 
 val find_all_by_contact
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_context.user
   -> Contact.Id.t
   -> (Group.Public.t list * Public.t list) Lwt.t
 
 val find_all_required_by_contact
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_context.user
   -> Contact.Id.t
   -> (Group.Public.t list * Public.t list) Lwt.t
 
-val find_to_merge_contact : Database.ctx -> Contact.Id.t -> Public.t list Lwt.t
+val find_to_merge_contact : _ Database.ctx -> Contact.Id.t -> Public.t list Lwt.t
 
 val find_unanswered_required_by_contact
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_context.user
   -> Contact.Id.t
   -> (Group.Public.t list * Public.t list) Lwt.t
 
 val find_unanswered_ungrouped_required_by_contact
-  :  Database.ctx
+  :  _ Database.ctx
   -> Pool_context.user
   -> Contact.Id.t
   -> Public.t list Lwt.t
 
 val find_multiple_by_contact
   :  ?is_admin:bool
-  -> Database.ctx
+  -> _ Database.ctx
   -> Contact.Id.t
   -> Contact.Id.t list
   -> Public.t list Lwt.t
 
 val find_by_contact
   :  ?is_admin:bool
-  -> Database.ctx
+  -> _ Database.ctx
   -> Contact.Id.t
   -> Id.t
   -> (Public.t, Pool_message.Error.t) Lwt_result.t
 
-val all_required_answered : Database.ctx -> Contact.Id.t -> bool Lwt.t
-val all_answered : Database.ctx -> Contact.Id.t -> bool Lwt.t
-val all_prompted_on_registration : Database.ctx -> Public.t list Lwt.t
+val all_required_answered : _ Database.ctx -> Contact.Id.t -> bool Lwt.t
+val all_answered : _ Database.ctx -> Contact.Id.t -> bool Lwt.t
+val all_prompted_on_registration : _ Database.ctx -> Public.t list Lwt.t
 
 val find_public_by_contacts_and_view
-  :  Database.ctx
+  :  _ Database.ctx
   -> bool
   -> Contact.Id.t list
   -> [< `SessionClose | `SessionDetail ]
   -> Public.t list Lwt.t
 
 val find_option
-  :  Database.ctx
+  :  _ Database.ctx
   -> SelectOption.Id.t
   -> (SelectOption.t, Pool_message.Error.t) Lwt_result.t
 
-val find_options_by_field : Database.ctx -> Id.t -> SelectOption.t list Lwt.t
+val find_options_by_field : _ Database.ctx -> Id.t -> SelectOption.t list Lwt.t
 
 val find_group
-  :  Database.ctx
+  :  _ Database.ctx
   -> Group.Id.t
   -> (Group.t, Pool_message.Error.t) Lwt_result.t
 
-val find_groups_by_model : Database.ctx -> Model.t -> Group.t list Lwt.t
-val find_names : Database.ctx -> Id.t list -> (Pool_common.Id.t * Name.t) list Lwt.t
+val find_groups_by_model : _ Database.ctx -> Model.t -> Group.t list Lwt.t
+val find_names : _ Database.ctx -> Id.t list -> (Pool_common.Id.t * Name.t) list Lwt.t
 
 module VersionHistory : Changelog.TSig with type record = t
 module OptionVersionHistory : Changelog.TSig with type record = SelectOption.t
@@ -599,7 +599,7 @@ module Repo : sig
 
   module VersionHistory : sig
     val find_answer
-      :  Database.ctx
+      :  _ Database.ctx
       -> Contact.Id.t
       -> Id.t
       -> AnswerRecord.t option Lwt.t

@@ -182,7 +182,7 @@ val file_fields : Pool_message.Field.t list
 val find : Id.t -> (t, Pool_message.Error.t) Lwt_result.t
 val find_full : Id.t -> (Write.t, Pool_message.Error.t) Lwt_result.t
 val find_by_label : Database.Label.t -> (t, Pool_message.Error.t) Lwt_result.t
-val find_by_db_ctx : Database.ctx -> (t, Pool_message.Error.t) Lwt_result.t
+val find_by_db_ctx : _ Database.ctx -> (t, Pool_message.Error.t) Lwt_result.t
 
 val find_by_url
   :  ?should_cache:(t -> bool)
@@ -212,7 +212,7 @@ type event =
   | ActivateMaintenance of Write.t
   | DeactivateMaintenance of Write.t
 
-val handle_event : Database.ctx -> event -> unit Lwt.t
+val handle_event : _ Database.ctx -> event -> unit Lwt.t
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string

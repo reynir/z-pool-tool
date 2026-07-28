@@ -54,36 +54,36 @@ type event =
 val equal_event : event -> event -> bool
 val pp_event : Format.formatter -> event -> unit
 val show_event : event -> string
-val handle_event : Database.ctx -> event -> unit Lwt.t
-val find : Database.ctx -> Pool_common.Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val handle_event : _ Database.ctx -> event -> unit Lwt.t
+val find : _ Database.ctx -> Pool_common.Id.t -> (t, Pool_message.Error.t) Lwt_result.t
 
 val find_by_experiment
   :  ?query:Query.t
-  -> Database.ctx
+  -> _ Database.ctx
   -> Experiment.Id.t
   -> (t list * Query.t) Lwt.t
 
-val find_by_contact : Database.ctx -> Contact.t -> t list Lwt.t
+val find_by_contact : _ Database.ctx -> Contact.t -> t list Lwt.t
 
 val find_by_contact_to_merge
-  :  Database.ctx
+  :  _ Database.ctx
   -> contact:Contact.t
   -> merged_contact:Contact.t
   -> t list Lwt.t
 
 val find_experiment_id_of_invitation
-  :  Database.ctx
+  :  _ Database.ctx
   -> t
   -> (Experiment.Id.t, Pool_message.Error.t) Lwt_result.t
 
 val find_multiple_by_experiment_and_contacts
-  :  Database.ctx
+  :  _ Database.ctx
   -> Contact.Id.t list
   -> Experiment.t
   -> Contact.Id.t list Lwt.t
 
 val find_by_contact_and_experiment_opt
-  :  Database.ctx
+  :  _ Database.ctx
   -> Experiment.Id.t
   -> Contact.Id.t
   -> t option Lwt.t

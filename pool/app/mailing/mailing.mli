@@ -169,23 +169,23 @@ val created : t * Experiment.Id.t -> event
 val updated : update * t -> event
 val deleted : t -> event
 val stopped : t -> event
-val handle_event : ?user_uuid:Pool_common.Id.t -> Database.ctx -> event -> unit Lwt.t
-val find : Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
+val handle_event : ?user_uuid:Pool_common.Id.t -> _ Database.ctx -> event -> unit Lwt.t
+val find : _ Database.ctx -> Id.t -> (t, Pool_message.Error.t) Lwt_result.t
 
 val find_with_detail
-  :  Database.ctx
+  :  _ Database.ctx
   -> Id.t
   -> (t * InvitationCount.t, Pool_message.Error.t) Lwt_result.t
 
-val find_by_experiment : Database.ctx -> Experiment.Id.t -> t list Lwt.t
+val find_by_experiment : _ Database.ctx -> Experiment.Id.t -> t list Lwt.t
 
 val find_by_experiment_with_count
-  :  Database.ctx
+  :  _ Database.ctx
   -> Query.t option
   -> Experiment.Id.t
   -> ((t * InvitationCount.t) list * Query.t) Lwt.t
 
-val find_overlaps : Database.ctx -> t -> t list Lwt.t
+val find_overlaps : _ Database.ctx -> t -> t list Lwt.t
 
 module Status : sig
   module ToHandle : sig
@@ -211,7 +211,7 @@ module Status : sig
   val equal : t -> t -> bool
   val pp : Format.formatter -> t -> unit
   val show : t -> string
-  val find_current : Database.ctx -> Ptime.span -> t list Lwt.t
+  val find_current : _ Database.ctx -> Ptime.span -> t list Lwt.t
 end
 
 module Repo : sig
