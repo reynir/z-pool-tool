@@ -132,7 +132,6 @@ type _ ctx =
 
 let label_of_ctx (type maybe_transaction) : maybe_transaction ctx -> Label.t =
   function
-  | Label label | Connection { label; _ } -> label
-  | TransactionalConnection { label; _ } -> label
+  | Label label | Connection { label; _ } | TransactionalConnection { label; _ } -> label
 
 let to_ctx db_ctx = Label.to_ctx (label_of_ctx db_ctx)
